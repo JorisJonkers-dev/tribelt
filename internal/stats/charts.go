@@ -30,7 +30,7 @@ type Bar struct {
 
 const (
 	chartW, chartH       = 820, 280
-	padL, padR, padT, pb = 48, 16, 34, 30
+	padL, padR, padT, pb = 48, 16, 50, 30
 	font                 = `font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif"`
 )
 
@@ -109,9 +109,9 @@ func LineChart(title string, days []time.Time, series []Series, markers []Marker
 		}
 		fmt.Fprintf(&b, `<polyline fill="none" stroke="%s" stroke-width="2" points="%s"><title>%s</title></polyline>`, s.Color, strings.Join(pts, " "), html.EscapeString(s.Name))
 	}
-	lx := padL + 260
+	lx := padL
 	for _, s := range series {
-		fmt.Fprintf(&b, `<rect x="%d" y="9" width="10" height="10" fill="%s"/><text x="%d" y="18" fill="#1c2430">%s</text>`, lx, s.Color, lx+14, html.EscapeString(s.Name))
+		fmt.Fprintf(&b, `<rect x="%d" y="26" width="10" height="10" fill="%s"/><text x="%d" y="35" fill="#1c2430">%s</text>`, lx, s.Color, lx+14, html.EscapeString(s.Name))
 		lx += 24 + 7*len(s.Name)
 	}
 	b.WriteString(`</svg>`)
@@ -128,8 +128,12 @@ func drawMarkers(b *strings.Builder, days []time.Time, markers []Marker, x func(
 		if !ok {
 			continue
 		}
-		fmt.Fprintf(b, `<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" stroke="#1c2430" stroke-dasharray="4 3"/><text x="%.1f" y="%d" fill="#1c2430" font-size="11">%s</text>`,
-			x(i), x(i), padT-4, chartH-pb, x(i)+3, padT+8, html.EscapeString(m.Label))
+		anchor, dx := "start", 3.0
+		if x(i) > chartW/2 {
+			anchor, dx = "end", -3
+		}
+		fmt.Fprintf(b, `<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" stroke="#1c2430" stroke-dasharray="4 3"/><text x="%.1f" y="%d" text-anchor="%s" fill="#1c2430" font-size="11">%s</text>`,
+			x(i), x(i), padT-4, chartH-pb, x(i)+dx, padT+8, anchor, html.EscapeString(m.Label))
 	}
 }
 
