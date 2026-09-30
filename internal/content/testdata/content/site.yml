@@ -1,0 +1,33 @@
+release: { label: v1-fixture, note: "Fixture release for tests" }
+baseUrl: https://mirror.test
+official: https://www.tribelt.nl
+org:
+  legalName: Tribelt B.V.
+  name: Tribelt
+  url: https://www.tribelt.nl
+  logo: images/logo.svg
+  address: { street: Metaalstraat 9, postalCode: 7483 PD, locality: Haaksbergen, country: NL }
+  telephone: "+31 74 250 18 77"
+  email: info@tribelt.nl
+  foundingDate: "2002"
+  parentOrganization: Lesjöfors Group
+  sameAs: [ "https://www.linkedin.com/company/tribelt" ]
+locales:
+  nl:
+    prefix: ""
+    hreflang: nl
+    name: Nederlands
+    nav: [ { label: Banden, id: transportbanden--draadogenbanden } ]
+    footer: { note: "Studententestsite, niet de officiële site van Tribelt.", officialLabel: "Deze pagina op tribelt.nl", officialSiteLabel: "Officiële site", privacyLabel: "Privacy" }
+  en:
+    prefix: /en
+    hreflang: en
+    name: English
+    nav: [ { label: Belts, id: transportbanden--draadogenbanden } ]
+    footer: { note: "Student test site, not Tribelt's official site.", officialLabel: "This page on tribelt.nl", officialSiteLabel: "Official site", privacyLabel: "Privacy" }
+  de:
+    prefix: /de
+    hreflang: de-DE
+    name: Deutsch
+    nav: []
+    footer: { note: "Studentische Testseite, nicht die offizielle Website von Tribelt.", officialLabel: "Diese Seite auf tribelt.nl", officialSiteLabel: "Offizielle Website", privacyLabel: "Datenschutz" }

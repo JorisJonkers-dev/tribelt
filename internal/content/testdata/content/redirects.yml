@@ -1,0 +1,2 @@
+- { from: /transportbanden, to: /metalen-transportbanden }
+- { from: /producten, to: /transportbanden }

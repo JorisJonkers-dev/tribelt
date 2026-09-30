@@ -1,0 +1,144 @@
+{{define "head"}}<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<meta name="description" content="{{.Description}}">
+{{- if .Keywords}}
+<meta name="keywords" content="{{.Keywords}}">{{end}}
+{{- if .Noindex}}
+<meta name="robots" content="noindex, follow">{{end}}
+{{- if .Canonical}}
+<link rel="canonical" href="{{.Canonical}}">{{end}}
+{{- range .Alternates}}
+<link rel="alternate" hreflang="{{.Hreflang}}" href="{{.URL}}">{{end}}
+{{- if .MarkdownURL}}
+<link rel="alternate" type="text/markdown" href="{{.MarkdownURL}}">{{end}}
+<meta property="og:type" content="{{.OGType}}">
+<meta property="og:site_name" content="{{.SiteName}}">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+{{- if .Canonical}}
+<meta property="og:url" content="{{.Canonical}}">{{end}}
+<meta property="og:locale" content="{{.OGLocale}}">
+{{- range .OGAltLocales}}
+<meta property="og:locale:alternate" content="{{.}}">{{end}}
+{{- if .OGImage}}
+<meta property="og:image" content="{{.OGImage}}">
+<meta property="og:image:alt" content="{{.OGImageAlt}}">
+<meta name="twitter:card" content="summary_large_image">{{else}}
+<meta name="twitter:card" content="summary">{{end}}
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="{{.CSS}}">
+{{- if .JSONLD}}
+<script type="application/ld+json">{{.JSONLD}}</script>{{end}}
+<script src="{{.Beacon}}" defer data-hit="{{.Hit}}"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{.UI.Skip}}</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="{{.HomeHref}}">{{.SiteName}} <span class="brand-tag">{{.UI.Mirror}}</span></a>
+    <nav class="lang" aria-label="{{.UI.Language}}">
+      {{- range .Languages}}
+      {{if .Current}}<span aria-current="true" lang="{{.Hreflang}}">{{.Code}}</span>{{else}}<a href="{{.Href}}" hreflang="{{.Hreflang}}" lang="{{.Hreflang}}">{{.Code}}</a>{{end}}
+      {{- end}}
+    </nav>
+  </div>
+  <nav class="wrap main-nav" aria-label="{{.UI.Menu}}">
+    <ul>
+      {{- range .Nav}}
+      <li><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>
+      {{- end}}
+    </ul>
+  </nav>
+</header>
+{{end}}
+
+{{define "foot"}}
+<footer class="site-footer">
+  <div class="wrap">
+    <p class="note">{{.Footer.Note}}</p>
+    <p class="links">
+      <a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{.Footer.SiteURL}}">{{.Footer.SiteLabel}}</a>
+      {{- if .Footer.PrivacyHref}}
+      <span aria-hidden="true">·</span>
+      <a href="{{.Footer.PrivacyHref}}">{{.Footer.PrivacyLabel}}</a>{{end}}
+      {{- if .MarkdownURL}}
+      <span aria-hidden="true">·</span>
+      <a href="{{.MarkdownURL}}" type="text/markdown">Markdown</a>{{end}}
+    </p>
+  </div>
+</footer>
+</body>
+</html>
+{{end}}
+
+{{define "page"}}{{template "head" .}}
+<main id="main" class="wrap">
+  {{- if .Breadcrumbs}}
+  <nav class="crumbs" aria-label="{{.UI.Breadcrumb}}">
+    <ol>
+      {{- range .Breadcrumbs}}
+      <li>{{if .Href}}<a href="{{.Href}}">{{.Name}}</a>{{else}}<span aria-current="page">{{.Name}}</span>{{end}}</li>
+      {{- end}}
+    </ol>
+  </nav>
+  {{- end}}
+  <article class="page page-{{.Type}}">
+    <h1>{{.H1}}</h1>
+    {{- if .Image}}
+    <figure class="lead">
+      <img src="{{.Image.Src}}"{{if .Image.Srcset}} srcset="{{.Image.Srcset}}" sizes="(min-width: 60rem) 56rem, 100vw"{{end}}{{if .Image.Width}} width="{{.Image.Width}}" height="{{.Image.Height}}"{{end}} alt="{{.Image.Alt}}" fetchpriority="high">
+      {{- if .Image.Credit}}<figcaption>{{.Image.Credit}}</figcaption>{{end}}
+    </figure>
+    {{- end}}
+    {{- if .CTA}}
+    <p class="cta-top"><a class="cta" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a></p>
+    {{- end}}
+    <div class="prose">{{.Body}}</div>
+    {{- if .Product}}
+    <section class="specs" aria-labelledby="specs-h">
+      <h2 id="specs-h">{{.UI.Specs}}</h2>
+      <table>
+        <caption>{{.Product.Name}}{{if .Product.Category}} · {{.Product.Category}}{{end}}</caption>
+        <tbody>
+          {{- range .Product.Specs}}
+          <tr><th scope="row">{{.Name}}</th><td>{{.Value}}{{if .Unit}} {{.Unit}}{{end}}</td></tr>
+          {{- end}}
+          {{- if .Product.Materials}}
+          <tr><th scope="row">{{$.UI.Materials}}</th><td>{{join .Product.Materials ", "}}</td></tr>
+          {{- end}}
+        </tbody>
+      </table>
+    </section>
+    {{- end}}
+    {{- if .FAQ}}
+    <section class="faq" aria-labelledby="faq-h">
+      <h2 id="faq-h">{{.UI.FAQ}}</h2>
+      {{- range .FAQ}}
+      <details>
+        <summary>{{.Q}}</summary>
+        <div class="answer">{{.A}}</div>
+      </details>
+      {{- end}}
+    </section>
+    {{- end}}
+    {{- if .CTA}}
+    <p class="cta-bottom"><a class="cta" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a></p>
+    {{- end}}
+  </article>
+</main>
+{{template "foot" .}}{{end}}
+
+{{define "notfound"}}{{template "head" .}}
+<main id="main" class="wrap">
+  <article class="page">
+    <h1>{{.H1}}</h1>
+    <div class="prose"><p>{{.Description}}</p><p><a href="{{.HomeHref}}">{{.UI.BackHome}}</a></p></div>
+  </article>
+</main>
+{{template "foot" .}}{{end}}
