@@ -1,0 +1,18 @@
+# gitleaks config for JorisJonkers-dev repos. Extends the upstream default ruleset.
+title = "JorisJonkers-dev gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures generate throwaway keys at runtime; nothing secret is committed."
+paths = [
+  '''(.*?)(example|sample|fixture|test)(.*?)\.(env|json|ya?ml)$''',
+  # Raw pages of the public tribelt.nl crawl (git-ignored): third-party embed keys, not ours.
+  '''^crawl/html/''',
+  '''node_modules/''',
+  '''^bin/''',
+]
+regexes = [
+  '''EXAMPLE_[A-Z0-9_]+''',
+]

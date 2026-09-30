@@ -1,0 +1,14 @@
+# Local Postgres for `task dev` and `task e2e`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tribelt
+      POSTGRES_PASSWORD: tribelt
+      POSTGRES_DB: tribelt_db
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tribelt -d tribelt_db"]
+      interval: 2s
+      retries: 20

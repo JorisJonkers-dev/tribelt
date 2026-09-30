@@ -1,0 +1,68 @@
+# Lint gate. Zero issues is required.
+version: "2"
+
+run:
+  timeout: 10m
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - depguard
+    - errname
+    - errorlint
+    - exhaustive
+    - gochecknoglobals
+    - gocognit
+    - gocritic
+    - gosec
+    - nilerr
+    - nilnil
+    - noctx
+    - revive
+    - unparam
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: false
+    gocognit:
+      min-complexity: 20
+    depguard:
+      rules:
+        visits-is-pure:
+          files:
+            - "**/internal/visits/*.go"
+          deny:
+            - pkg: net/http
+              desc: classification is pure; HTTP belongs in internal/hits
+            - pkg: github.com/jackc/pgx
+              desc: classification is pure; persistence belongs in internal/hits
+            - pkg: os
+              desc: classification is pure; ranges are embedded
+  exclusions:
+    rules:
+      # Sparse comments by convention: no doc comment required on every exported name.
+      - linters:
+          - revive
+        text: "^(exported|package-comments):"
+      - path: _test\.go
+        linters:
+          - gocognit
+          - gochecknoglobals
+          - gosec
+          - noctx
+      - path: pgtest/
+        linters:
+          - gochecknoglobals
+      # Developer commands write where the developer points them.
+      - path: cmd/(update-ranges|release-label)/
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/JorisJonkers-dev/tribelt

@@ -1,0 +1,122 @@
+# One command per loop. `task` lists targets; `task check` is what CI runs.
+version: "3"
+
+vars:
+  APP: tribelt
+  COVERAGE_MIN: 80
+  DATABASE_URL: postgres://tribelt:tribelt@localhost:5433/tribelt_db?sslmode=disable
+
+tasks:
+  default:
+    cmd: task --list
+    silent: true
+
+  fmt:
+    desc: Fail if any file is not gofumpt/goimports formatted
+    cmd: golangci-lint fmt --diff ./...
+
+  gen:
+    desc: Regenerate sqlc code from db/queries and db/migrations
+    cmd: sqlc generate
+
+  gen:check:
+    desc: Fail if generated code is stale
+    cmds:
+      - task: gen
+      - git diff --exit-code -- internal/platform/pg/queries
+
+  lint:
+    desc: All linters
+    cmds:
+      - task: lint:go
+      - task: lint:sql
+      - task: lint:actions
+
+  lint:go:
+    desc: golangci-lint
+    cmd: golangci-lint run ./...
+
+  lint:sql:
+    desc: Migration safety lint (squawk)
+    cmd: squawk db/migrations/*.sql
+
+  lint:actions:
+    desc: actionlint on every workflow
+    cmd: actionlint
+
+  vet:
+    desc: go vet
+    cmd: go vet ./...
+
+  test:
+    desc: Go tests (race, real Postgres via testcontainers, real content/ gates) with a {{.COVERAGE_MIN}}% coverage gate
+    cmds:
+      - go test -race -count=1 -covermode=atomic -coverpkg=./internal/... -coverprofile=coverage.out ./...
+      - |
+        total="$(go tool cover -func=coverage.out | awk '/^total:/ { sub("%", "", $3); print $3 }')"
+        echo "coverage: ${total}% (minimum {{.COVERAGE_MIN}}%)"
+        awk -v t="$total" -v m="{{.COVERAGE_MIN}}" 'BEGIN { exit !(t >= m) }'
+
+  test:visits:
+    desc: The pure classifier must stay at 100% coverage
+    cmds:
+      - go test -count=1 -coverprofile=visits.out ./internal/visits/
+      - |
+        total="$(go tool cover -func=visits.out | awk '/^total:/ { sub("%", "", $3); print $3 }')"
+        echo "internal/visits coverage: ${total}%"
+        awk -v t="$total" 'BEGIN { exit !(t >= 100) }'
+
+  release-gate:
+    desc: Fail if content/ changed without a new Content Release label (BASE_REF, default origin/main)
+    cmd: scripts/check-content-release.sh {{.CLI_ARGS}}
+
+  build:
+    desc: Build the service binary
+    env:
+      CGO_ENABLED: "0"
+    cmd: go build -trimpath -o bin/{{.APP}} ./cmd/{{.APP}}
+
+  secrets:
+    desc: Scan the working tree for secrets
+    cmd: gitleaks dir --no-banner --redact .
+
+  check:
+    desc: Everything CI runs on a pull request except E2E
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: gen:check
+      - task: vet
+      - task: test
+      - task: test:visits
+      - task: release-gate
+      - task: build
+      - task: secrets
+
+  fix:
+    desc: Apply formatters and autofixes
+    cmds:
+      - golangci-lint fmt ./...
+      - golangci-lint run --fix ./...
+
+  update-ranges:
+    desc: Refresh the bundled crawler IP ranges from the operators' published lists
+    cmd: go run ./cmd/update-ranges internal/visits/ranges
+
+  db:
+    desc: Start local Postgres (compose, port 5433)
+    cmd: docker compose up -d --wait postgres
+
+  dev:
+    desc: Run against local Postgres with the stats sign-in bypassed (never in production)
+    deps: [db]
+    env:
+      DATABASE_URL: "{{.DATABASE_URL}}"
+      DEV_AUTH_BYPASS: "1"
+      CONTENT_DIR: content
+    cmd: go run ./cmd/{{.APP}} serve
+
+  e2e:
+    desc: Playwright beacon smoke test (starts Postgres and the built binary)
+    deps: [db, build]
+    cmd: scripts/e2e.sh

@@ -1,2 +1,31 @@
+# Build and test output
+bin/
+coverage.out
+visits.out
+*.test
+
+# Playwright
+tests/e2e/node_modules/
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+
+# Env / secrets (never commit)
+.env
+.env.*
+!.env.example
+*.local
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.log
+
+# Agent scratch
+.claude/worktrees/
+scratchpad/
+
+# Raw crawl pages stay local
 crawl/html/
 crawl/home/

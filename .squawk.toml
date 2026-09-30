@@ -1,0 +1,2 @@
+# goose runs every migration file in its own transaction.
+assume_in_transaction = true
