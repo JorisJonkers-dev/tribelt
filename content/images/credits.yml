@@ -1,0 +1,120 @@
+# Every image is from the official Tribelt website (Webflow CDN), re-encoded as webp in 480, 960 and full (max 1600px) widths.
+- id: home
+  src: images/home.webp
+  variants: [images/home-480.webp, images/home-960.webp]
+  alt: "Medewerker van Tribelt aan het werk in de productiehal in Haaksbergen"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68d5375a4fa0c1e148f948bf_BS_03504.avif
+- id: over-ons
+  src: images/over-ons.webp
+  variants: [images/over-ons-480.webp, images/over-ons-960.webp]
+  alt: "Lasser van Tribelt werkt aan de rand van een metalen transportband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/6a9a6d49dbcdc6aa1ac8a647_BS_03601_converted.avif
+- id: cases
+  src: images/cases.webp
+  variants: [images/cases-480.webp, images/cases-960.webp]
+  alt: "Medewerker met werkhandschoenen controleert een metalen transportband in de fabriek van Tribelt"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68d537673cc851d3be72f3cc_BS_03570.avif
+- id: cases--glapor
+  src: images/cases--glapor.webp
+  variants: [images/cases--glapor-480.webp, images/cases--glapor-960.webp]
+  alt: "Glapor-plaat van schuimglas op een metalen gaasband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dcb7476c29eef818bcbfb5_Ontwerp%20zonder%20titel%20(3).jpg
+- id: transportbanden--draadogenbanden
+  src: images/transportbanden--draadogenbanden.webp
+  variants: [images/transportbanden--draadogenbanden-480.webp, images/transportbanden--draadogenbanden-960.webp]
+  alt: "Twee stukken draadogenband van Tribelt met schalmen, op een donkere ondergrond"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbdf890632eacfc8955442_Draadogenbanden.webp
+- id: transportbanden--open-spiraalbanden
+  src: images/transportbanden--open-spiraalbanden.webp
+  variants: [images/transportbanden--open-spiraalbanden-480.webp, images/transportbanden--open-spiraalbanden-960.webp]
+  alt: "Stukken open spiraalband van Tribelt met verschillende maaswijdtes op een donkere ondergrond"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe001ee91a070bf469912_Spiraalbanden%20open.webp
+- id: transportbanden--gesloten-spiraalbanden
+  src: images/transportbanden--gesloten-spiraalbanden.webp
+  variants: [images/transportbanden--gesloten-spiraalbanden-480.webp, images/transportbanden--gesloten-spiraalbanden-960.webp]
+  alt: "Twee stukken gesloten spiraalband van Tribelt met een dicht geweven oppervlak"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe17d2affa365d26b683e_Spiraalbanden%20gesloten.webp
+- id: transportbanden--tri-flex
+  src: images/transportbanden--tri-flex.webp
+  variants: [images/transportbanden--tri-flex-480.webp, images/transportbanden--tri-flex-960.webp]
+  alt: "Tri-Flex bochtenband van Tribelt met scharnierende zijschakels op een donkere ondergrond"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe4ae3270206440c03320_Triflex.webp
+- id: transportbanden--aandrijvingen
+  src: images/transportbanden--aandrijvingen.webp
+  variants: [images/transportbanden--aandrijvingen-480.webp, images/transportbanden--aandrijvingen-960.webp]
+  alt: "Tandwielen en aandrijfwielen van RVS en blauwe kunststof voor metalen transportbanden"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe58da7f3ffa266642419_Tandwielen%20op%20maat.webp
+- id: transportbanden--overige-banden
+  src: images/transportbanden--overige-banden.webp
+  variants: [images/transportbanden--overige-banden-480.webp, images/transportbanden--overige-banden-960.webp]
+  alt: "Stavenband en grilleband van Tribelt als voorbeelden van overige metalen bandtypes"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dc2c662e28f9cd2d503b6c_Overige%20banden.webp
+- id: sectoren--automotive
+  src: images/sectoren--automotive.webp
+  variants: [images/sectoren--automotive-480.webp, images/sectoren--automotive-960.webp]
+  alt: "Auto-carrosserieën op een assemblagelijn in de automotive-industrie"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a683896bb2c7ac030c53a_68dbf4d8687b5bf9d98ba3a3_Automotive_converted.avif
+- id: sectoren--farmacie-medische-hulpmiddelen
+  src: images/sectoren--farmacie-medische-hulpmiddelen.webp
+  variants: [images/sectoren--farmacie-medische-hulpmiddelen-480.webp, images/sectoren--farmacie-medische-hulpmiddelen-960.webp]
+  alt: "Glazen ampullen in een farmaceutische vul- en sterilisatielijn"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a68475348695f46a4c2c5_68dbf4c3274a54aae7884a59_Medische_converted.avif
+- id: sectoren--interne-transportoplossingen
+  src: images/sectoren--interne-transportoplossingen.webp
+  variants: [images/sectoren--interne-transportoplossingen-480.webp, images/sectoren--interne-transportoplossingen-960.webp]
+  alt: "Gloeiende glazen flessen op een transportlijn in een productiehal"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a684e4a9b18aa4f84af35_Interne%20transportoplossingen.avif
+- id: sectoren--waterbehandeling-filtratie
+  src: images/sectoren--waterbehandeling-filtratie.webp
+  variants: [images/sectoren--waterbehandeling-filtratie-480.webp, images/sectoren--waterbehandeling-filtratie-960.webp]
+  alt: "Transportband die grof materiaal afvoert in een waterbehandelingsinstallatie"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a6831833d25a03551e5dc_68dbf4e241ffc862b1e8b90d_filtratie_converted.avif
+- id: sectoren--zonne-energie-elektronica
+  src: images/sectoren--zonne-energie-elektronica.webp
+  variants: [images/sectoren--zonne-energie-elektronica-480.webp, images/sectoren--zonne-energie-elektronica-960.webp]
+  alt: "Zonnecellen op een transportsysteem in een productielijn voor zonnepanelen"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a683fb5d873c1920c17b5_68dbf4ccf9d13952daa052b7_Zonne%20energie_converted.avif
+- id: kenniscentrum--tri-flex-productie-toepassing-en-expertise
+  src: images/kenniscentrum--tri-flex-productie-toepassing-en-expertise.webp
+  variants: [images/kenniscentrum--tri-flex-productie-toepassing-en-expertise-480.webp, images/kenniscentrum--tri-flex-productie-toepassing-en-expertise-960.webp]
+  alt: "Bundel metalen insteekdraden voor de productie van transportbanden"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe574caf0a72acda879a8_TriFlex%201.jpg
+- id: kenniscentrum--open-spiraalbanden-productie-toepassing-en-expertise
+  src: images/kenniscentrum--open-spiraalbanden-productie-toepassing-en-expertise.webp
+  variants: [images/kenniscentrum--open-spiraalbanden-productie-toepassing-en-expertise-480.webp, images/kenniscentrum--open-spiraalbanden-productie-toepassing-en-expertise-960.webp]
+  alt: "Close-up van gevlochten spiralen in een open spiraalband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe1436a9484182d9c812d_Spiraalbanden%20open%203.jpg
+- id: kenniscentrum--gesloten-spiraalbanden-productie-toepassing-en-expertise
+  src: images/kenniscentrum--gesloten-spiraalbanden-productie-toepassing-en-expertise.webp
+  variants: [images/kenniscentrum--gesloten-spiraalbanden-productie-toepassing-en-expertise-480.webp, images/kenniscentrum--gesloten-spiraalbanden-productie-toepassing-en-expertise-960.webp]
+  alt: "Dicht geweven gesloten spiraalband van dichtbij"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbe29db3c81b67a71e4556_Spiraalbanden%20gesloten%202.jpg
+- id: kenniscentrum--draadogenbanden-productie-toepassing-en-expertise
+  src: images/kenniscentrum--draadogenbanden-productie-toepassing-en-expertise.webp
+  variants: [images/kenniscentrum--draadogenbanden-productie-toepassing-en-expertise-480.webp, images/kenniscentrum--draadogenbanden-productie-toepassing-en-expertise-960.webp]
+  alt: "Close-up van een draadogenband met open maasstructuur"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68dbdfdd1282af9c48acc192_Draadogenbanden%201.jpg
+- id: logo
+  src: images/logo.svg
+  alt: "Logo van Tribelt"
+  credit: "Logo: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68dccc1609305b543831f54a_logo-tribelt-oranje-zwart.svg

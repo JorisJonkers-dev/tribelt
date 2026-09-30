@@ -1,0 +1,17 @@
+# Official 301s on www.tribelt.nl, probed with `curl -sI` on 2026-09-30.
+# Official chains (/producten -> /transportbanden -> /metalen-transportbanden,
+# /en/transportbanden -> /en/conveyor-belts -> /en/metal-conveyor-belts) are collapsed to one hop.
+# Not listed: the official site also 301s every path with a trailing slash to the path without it.
+- { from: /transportbanden, to: /metalen-transportbanden }
+- { from: /producten, to: /metalen-transportbanden }
+- { from: /downloads, to: / }
+- { from: /en/conveyor-belts, to: /en/metal-conveyor-belts }
+- { from: /en/conveyorbelts, to: /en/metal-conveyor-belts }
+- { from: /en/transportbanden, to: /en/metal-conveyor-belts }
+- { from: /en/kenniscentrum, to: /en/knowledge-center }
+- { from: /en/nieuws, to: /en/news }
+- { from: /en/over-ons, to: /en/about-us }
+- { from: /en/privacyverklaring, to: /en/privacy-statement }
+- { from: /en/sectoren, to: /en/sectors }
+- { from: /en/veelgestelde-vragen, to: /en/faq }
+- { from: /en/werken-bij-tribelt, to: /en/working-at-tribelt }

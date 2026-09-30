@@ -1,0 +1,80 @@
+release:
+  label: v1-baseline
+  note: "First Content Release: adapted mirror of tribelt.nl"
+baseUrl: https://tribelt.jorisjonkers.dev
+official: https://www.tribelt.nl
+org:
+  legalName: Tribelt B.V.
+  name: Tribelt
+  url: https://www.tribelt.nl
+  logo: images/logo.svg
+  address:
+    street: Metaalstraat 9
+    postalCode: 7483 PD
+    locality: Haaksbergen
+    country: NL
+  telephone: "+31 74 250 18 77"
+  email: info@tribelt.nl
+  foundingDate: "2002"
+  parentOrganization: Lesjöfors Group
+  sameAs:
+    - https://www.tribelt.nl
+    - https://www.linkedin.com/company/de-spiraal-bv-and-tribelt-bv
+locales:
+  nl:
+    prefix: ""
+    hreflang: nl
+    name: Nederlands
+    nav:
+      - { label: Transportbanden, id: metalen-transportbanden }
+      - { label: Sectoren, id: sectoren }
+      - { label: Kenniscentrum, id: kenniscentrum }
+      - { label: Cases, id: cases }
+      - { label: Over Tribelt, id: over-ons }
+      - { label: Werken bij, id: werken-bij-tribelt }
+      - { label: Nieuws, id: nieuws }
+      - { label: Veelgestelde vragen, id: veelgestelde-vragen }
+      - { label: Contact, id: contact }
+    footer:
+      note: "Dit is een testsite van een student voor een universitair project over digitale strategie, gemaakt met toestemming van Tribelt. Dit is niet de officiële website van Tribelt; die staat op tribelt.nl."
+      officialLabel: "Deze pagina op tribelt.nl bekijken"
+      officialSiteLabel: "Officiële website: tribelt.nl"
+      privacyLabel: "Privacy op deze testsite"
+  en:
+    prefix: /en
+    hreflang: en
+    name: English
+    nav:
+      - { label: Conveyor belts, id: metalen-transportbanden }
+      - { label: Sectors, id: sectoren }
+      - { label: Knowledge centre, id: kenniscentrum }
+      - { label: Cases, id: cases }
+      - { label: About Tribelt, id: over-ons }
+      - { label: Careers, id: werken-bij-tribelt }
+      - { label: News, id: nieuws }
+      - { label: FAQ, id: veelgestelde-vragen }
+      - { label: Contact, id: contact }
+    footer:
+      note: "This is a student test site for a university project on digital strategy, made with Tribelt's permission. It is not Tribelt's official website, which is tribelt.nl."
+      officialLabel: "View this page on tribelt.nl"
+      officialSiteLabel: "Official website: tribelt.nl"
+      privacyLabel: "Privacy on this test site"
+  de:
+    prefix: /de
+    hreflang: de-DE
+    name: Deutsch
+    nav:
+      - { label: Förderbänder, id: metalen-transportbanden }
+      - { label: Sektoren, id: sectoren }
+      - { label: Wissenszentrum, id: kenniscentrum }
+      - { label: Projekte, id: cases }
+      - { label: Über Tribelt, id: over-ons }
+      - { label: Karriere, id: werken-bij-tribelt }
+      - { label: Neuigkeiten, id: nieuws }
+      - { label: FAQ, id: veelgestelde-vragen }
+      - { label: Kontakt, id: contact }
+    footer:
+      note: "Dies ist eine Testseite eines Studenten für ein Universitätsprojekt zur digitalen Strategie, erstellt mit Erlaubnis von Tribelt. Es ist nicht die offizielle Website von Tribelt; diese finden Sie unter tribelt.nl."
+      officialLabel: "Diese Seite auf tribelt.nl ansehen"
+      officialSiteLabel: "Offizielle Website: tribelt.nl"
+      privacyLabel: "Datenschutz auf dieser Testseite"
