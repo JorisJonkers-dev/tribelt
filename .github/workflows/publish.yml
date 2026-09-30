@@ -1,0 +1,116 @@
+# Tag-triggered publish flow for deploy-platform service repos.
+#
+# push of a v*.*.* tag drives:
+#   publish-image -> resolve-image-lock -> publish-deploy-artifact
+#
+# The image lock crosses the reusable-workflow boundary as an UPLOADED ARTIFACT, never a
+# runner-local path. The image embeds content/, so every Content Release needs a new tag.
+name: Publish
+
+# Manual until platform onboarding (database, secrets, namespace, OIDC client) is complete;
+# then switch this trigger to `push: tags: ['v*.*.*']`.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (vX.Y.Z)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  # -- 1. Build and push the multi-arch container image ----------------------
+  publish-image:
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@1efce81af819868fb2f5fd99ee7b04a1275845d8 # v0.18.0
+    with:
+      image-name: tribelt
+      version: ${{ inputs.tag }}
+      platforms: linux/amd64,linux/arm64
+    permissions:
+      contents: read
+      packages: write
+
+  # -- 2. Resolve the image lock (upload artifact, never path) --------------
+  resolve-image-lock:
+    needs: [publish-image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      images-lock-artifact: images-lock-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: resolve-image-digest
+        id: digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ghcr.io/jorisjonkers-dev/tribelt
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          digest="$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{json .Manifest}}' | jq -r '.digest')"
+          if [ -z "$digest" ] || [ "$digest" = "null" ]; then
+            echo "E_FLOATING_IMAGE: could not resolve a digest for ${IMAGE}:${TAG}" >&2
+            exit 1
+          fi
+          platforms="$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{json .Manifest}}' | jq -r '[.manifests[]?.platform | "\(.os)/\(.architecture)"] | join(",")')"
+          case "$platforms" in
+            *linux/amd64*linux/arm64*|*linux/arm64*linux/amd64*) echo "Platforms: $platforms" ;;
+            *) echo "E_SINGLE_ARCH: expected linux/amd64 and linux/arm64, got '$platforms'" >&2; exit 1 ;;
+          esac
+          echo "image-digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: lock-image
+        env:
+          IMAGE_DIGEST: ${{ steps.digest.outputs.image-digest }}
+        run: |
+          set -euo pipefail
+          case "$IMAGE_DIGEST" in
+            sha256:*) ;;
+            *) echo "E_FLOATING_IMAGE: IMAGE_DIGEST is not a digest ref (got: $IMAGE_DIGEST)" >&2; exit 1 ;;
+          esac
+          printf '{"tribelt":"ghcr.io/jorisjonkers-dev/tribelt@%s"}\n' "$IMAGE_DIGEST" > platform/images.lock.json
+          echo "Locked image: ghcr.io/jorisjonkers-dev/tribelt@${IMAGE_DIGEST}"
+
+      - name: verify-lock
+        run: |
+          set -euo pipefail
+          lock_ref=$(jq -r '.["tribelt"]' platform/images.lock.json)
+          case "$lock_ref" in
+            *@sha256:*) echo "Digest pin verified: $lock_ref" ;;
+            *) echo "E_FLOATING_IMAGE: lock ref is not digest-pinned: $lock_ref" >&2; exit 1 ;;
+          esac
+
+      - name: upload-image-lock
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: images-lock-${{ github.run_id }}
+          path: platform/images.lock.json
+          retention-days: 1
+
+  # -- 3. Render and publish the deploy artifact ----------------------------
+  publish-deploy-artifact:
+    needs: [resolve-image-lock]
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/deploy-artifact.yml@1efce81af819868fb2f5fd99ee7b04a1275845d8 # v0.18.0
+    with:
+      ref: ${{ inputs.tag }}
+      artifact-name: tribelt
+      artifact-version: ${{ inputs.tag }}
+      schema-version: 0.22.0
+      apply-bundle: true
+      context-ref: ghcr.io/jorisjonkers-dev/cluster-deploy-context-public@sha256:95dc39fc695694c8fb4b0c538d7fe13038d407c7302c3725c98f0496c6a83499
+      deploy-dir: platform
+      image-lock-artifact: ${{ needs.resolve-image-lock.outputs.images-lock-artifact }}
+      environments: production
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write

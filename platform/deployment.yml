@@ -1,0 +1,25 @@
+apiVersion: deployment.jorisjonkers.dev/v2
+kind: Deployment
+metadata:
+  name: tribelt
+spec:
+  schemaVersion: 0.16.0
+  namespace: tribelt
+  platform:
+    layer: apps-core
+  workloads:
+    - name: tribelt
+      image: tribelt
+      health:
+        path: /readyz
+        livenessPath: /healthz
+        port: 8080
+        timeoutClass: stateless
+        mandatory: true
+      rollbackTargetRetention:
+        minimumDays: 90
+        acknowledged: true
+      routes:
+        - host: tribelt.jorisjonkers.dev
+          owner: tribelt
+          authMode: anonymous

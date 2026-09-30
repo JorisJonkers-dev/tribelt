@@ -1,0 +1,106 @@
+# One pipeline ending in "Pipeline Complete", the only required check (estate convention).
+# ONE job: GitHub bills each job rounded up to a full minute, so checks are steps, not jobs.
+# Steps run `task` targets so CI and `task check` cannot drift, and carry
+# `if: ${{ !cancelled() }}` so one failure still surfaces the rest.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline-complete:
+    name: Pipeline Complete
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the Content Release gate diffs against the base branch
+
+      - uses: jdx/mise-action@v5
+        with:
+          cache: true
+
+      - name: Format
+        if: ${{ !cancelled() }}
+        run: task fmt
+
+      - name: Lint Go
+        if: ${{ !cancelled() }}
+        run: task lint:go
+
+      - name: Lint migrations (squawk)
+        if: ${{ !cancelled() }}
+        run: task lint:sql
+
+      - name: Lint workflows
+        if: ${{ !cancelled() }}
+        run: task lint:actions
+
+      - name: Generated code is current
+        if: ${{ !cancelled() }}
+        run: task gen:check
+
+      - name: Vet
+        if: ${{ !cancelled() }}
+        run: task vet
+
+      - name: Test (race, Postgres, route manifest, SEO lint, verbatim) and coverage
+        if: ${{ !cancelled() }}
+        run: task test
+
+      - name: Classifier coverage is 100%
+        if: ${{ !cancelled() }}
+        run: task test:visits
+
+      - name: Content changes start a new Content Release
+        if: ${{ !cancelled() }}
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: task release-gate
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: task build
+
+      - name: Secret scan
+        if: ${{ !cancelled() }}
+        run: task secrets
+
+      - name: Container image builds
+        if: ${{ !cancelled() }}
+        run: docker build --build-arg VERSION=ci -t tribelt:ci .
+
+      - name: Start Postgres and the site
+        id: server
+        if: ${{ !cancelled() }}
+        run: |
+          task db
+          DATABASE_URL='postgres://tribelt:tribelt@localhost:5433/tribelt_db?sslmode=disable' DEV_AUTH_BYPASS=1 TRIBELT_ADDR=:18080 \
+            bin/tribelt serve > /tmp/tribelt.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:18080/readyz >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/tribelt.log
+          exit 1
+
+      - name: Beacon smoke test (Playwright)
+        if: ${{ !cancelled() && steps.server.outcome == 'success' }}
+        working-directory: tests/e2e
+        env:
+          E2E_BASE_URL: http://localhost:18080
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test

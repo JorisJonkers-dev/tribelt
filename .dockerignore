@@ -1,0 +1,10 @@
+.git
+bin
+crawl
+docs
+tests
+coverage.out
+visits.out
+**/node_modules
+**/*_test.go
+**/testdata
