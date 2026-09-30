@@ -1,0 +1,33 @@
+:root{--ink:#1c2430;--muted:#5b6675;--line:#dfe3e8;--bg:#fff;--soft:#f4f6f8;--accent:#0b6e75}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:.95rem/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+.wrap{max-width:84rem;margin:0 auto;padding:0 1rem}
+.stats-head{background:var(--soft);border-bottom:1px solid var(--line)}
+.bar{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;padding-top:.6rem;padding-bottom:.4rem}
+.bar form{margin:0}
+.who{color:var(--muted)}
+.tabs{display:flex;flex-wrap:wrap;gap:1.2rem;padding-bottom:.5rem}
+.tabs a{text-decoration:none;color:var(--ink)}
+.tabs a[aria-current]{color:var(--accent);font-weight:700}
+.filters{display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:end;margin:1rem 0;padding:.75rem;border:1px solid var(--line);border-radius:.4rem}
+.filters label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted)}
+.filters .check{flex-direction:row;gap:.3rem;align-items:center}
+button,input,select{font:inherit}
+h1{font-size:1.5rem;margin:.5rem 0 1rem}
+h2{font-size:1.1rem;margin:1.5rem 0 .5rem}
+table{border-collapse:collapse;width:100%;margin-bottom:1rem}
+th,td{border-bottom:1px solid var(--line);padding:.3rem .5rem;text-align:left;vertical-align:top}
+th{font-size:.8rem;color:var(--muted);font-weight:600}
+.r{text-align:right;font-variant-numeric:tabular-nums}
+.wide{font-size:.85rem;display:block;overflow-x:auto}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(22rem,1fr));gap:1.5rem}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:1rem;margin-bottom:1rem}
+.tiles div{border:1px solid var(--line);border-radius:.4rem;padding:.75rem;color:var(--muted)}
+.tiles .n{display:block;font-size:1.6rem;font-weight:700;color:var(--ink)}
+.chart{margin:1rem 0;overflow-x:auto}
+.chart svg{max-width:100%;height:auto}
+.chart figcaption{font-size:.8rem}
+.chart button{font-size:.8rem;padding:0 .4rem}
+.muted{color:var(--muted)}
+.exports{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line)}

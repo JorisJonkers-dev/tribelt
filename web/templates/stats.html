@@ -1,0 +1,148 @@
+{{define "top"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Title}} · Tribelt mirror stats</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="{{.CSS}}">
+<script src="{{.ChartJS}}" defer></script>
+</head>
+<body class="stats">
+<header class="stats-head">
+  <div class="wrap bar">
+    <strong>Tribelt mirror · stats</strong>
+    <span class="release">Current Content Release: <code>{{.Release}}</code></span>
+    <form method="post" action="/auth/logout"><span class="who">{{.Viewer}}</span> <button type="submit">Sign out</button></form>
+  </div>
+  <nav class="wrap tabs" aria-label="Views">
+    <a href="/stats?{{.Filter.Query "path" ""}}"{{if eq .View "overview"}} aria-current="page"{{end}}>Overview</a>
+    <a href="/stats/pages?{{.Filter.Query "path" ""}}"{{if or (eq .View "pages") (eq .View "page")}} aria-current="page"{{end}}>Per page</a>
+    <a href="/stats/releases?{{.Filter.Query "path" ""}}"{{if eq .View "releases"}} aria-current="page"{{end}}>Release compare</a>
+    <a href="/stats/agents?{{.Filter.Query "path" ""}}"{{if eq .View "agents"}} aria-current="page"{{end}}>AI &amp; crawlers</a>
+  </nav>
+</header>
+<main class="wrap">
+<form class="filters" method="get">
+  {{if .Filter.Path}}<input type="hidden" name="path" value="{{.Filter.Path}}">{{end}}
+  <label>From <input type="date" name="from" value="{{.Filter.From.Format "2006-01-02"}}"></label>
+  <label>To <input type="date" name="to" value="{{.Filter.To.Format "2006-01-02"}}"></label>
+  <label>Locale <select name="locale"><option value="">all</option>{{range .Locales}}<option{{if eq . $.Filter.Locale}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+  <label>Release <select name="release"><option value="">all</option>{{range .Releases}}<option{{if eq .Label $.Filter.Release}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+  <label class="check"><input type="checkbox" name="internal" value="1"{{if .Filter.IncludeInternal}} checked{{end}}> include internal</label>
+  <button type="submit">Apply</button>
+</form>
+<h1>{{.Title}}</h1>
+{{end}}
+
+{{define "bottom"}}
+<p class="exports">Exports:
+  <a href="/stats/{{.View}}.csv?{{.Filter.Query}}">{{.View}}.csv</a> ·
+  <a href="/stats/hits.csv?{{.Filter.Query}}">raw hits.csv</a> ·
+  <a href="/stats/export.sqlite">anonymised SQLite database</a>
+</p>
+</main>
+</body>
+</html>
+{{end}}
+
+{{define "chart"}}<figure class="chart">{{.SVG}}<figcaption><a href="{{.SVGHref}}" download>SVG</a> · <button type="button" class="png" data-name="{{.Name}}">PNG</button></figcaption></figure>{{end}}
+
+{{define "overview"}}{{template "top" .}}
+{{with .Data}}
+<section class="tiles">
+  <div><span class="n">{{$.Num .Visitors.Visitors}}</span> Visitors</div>
+  <div><span class="n">{{$.Num .Visitors.ReturningVisitors}}</span> Returning Visitors</div>
+  <div><span class="n">{{$.Num .Visitors.DailyVisitors}}</span> Daily Visitors (no cookie)</div>
+  <div><span class="n">{{$.Num ($.SumOutbound .Outbound)}}</span> Outbound Clicks</div>
+</section>
+{{template "chart" ($.Chart "timeline")}}
+<div class="cols">
+<section><h2>Hits by Visitor Kind</h2>
+<table><thead><tr><th>Visitor Kind</th><th class="r">Hits</th><th class="r">Visitors</th></tr></thead><tbody>
+{{range .Kinds}}<tr><td>{{.VisitorKind}}</td><td class="r">{{$.Num .Hits}}</td><td class="r">{{$.Num .Visitors}}</td></tr>{{end}}
+</tbody></table></section>
+<section><h2>Outbound Clicks by Visitor Kind</h2>
+<table><thead><tr><th>Visitor Kind</th><th class="r">Clicks</th></tr></thead><tbody>
+{{range .Outbound}}<tr><td>{{.VisitorKind}}</td><td class="r">{{$.Num .Clicks}}</td></tr>{{else}}<tr><td colspan="2">none yet</td></tr>{{end}}
+</tbody></table></section>
+</div>
+{{template "chart" ($.Chart "channels")}}
+<div class="cols">
+<section><h2>Arrival Channel (human page views)</h2>
+<table><thead><tr><th>Channel</th><th class="r">Hits</th><th class="r">Visitors</th><th class="r">Beacon-confirmed</th></tr></thead><tbody>
+{{range .Channels}}<tr><td>{{.Channel}}</td><td class="r">{{$.Num .Hits}}</td><td class="r">{{$.Num .Visitors}}</td><td class="r">{{$.Num .Confirmed}}</td></tr>{{end}}
+</tbody></table></section>
+<section><h2>First-touch Channel (new Visitors)</h2>
+<table><thead><tr><th>Channel</th><th class="r">Visitors</th></tr></thead><tbody>
+{{range .FirstTouch}}<tr><td>{{.Channel}}</td><td class="r">{{$.Num .Visitors}}</td></tr>{{end}}
+</tbody></table></section>
+</div>
+<section><h2>Search Performance</h2>
+{{if .Search}}
+<table><thead><tr><th>Source</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">Avg position</th></tr></thead><tbody>
+{{range .Search}}<tr><td>{{.Source}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{$.Num .Impressions}}</td><td class="r">{{printf "%.1f" .AvgPosition}}</td></tr>{{end}}
+</tbody></table>
+<h3>Top queries</h3>
+<table><thead><tr><th>Query</th><th>Source</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">Position</th></tr></thead><tbody>
+{{range .Queries}}<tr><td>{{.Query}}</td><td>{{.Source}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{$.Num .Impressions}}</td><td class="r">{{printf "%.1f" .AvgPosition}}</td></tr>{{end}}
+</tbody></table>
+{{else}}<p class="muted">No Search Performance data for this range{{if not $.SearchEnabled}} (import disabled: no Search Console or Bing credentials){{end}}.</p>{{end}}
+</section>
+{{end}}
+{{template "bottom" .}}{{end}}
+
+{{define "pages"}}{{template "top" .}}
+<table class="wide"><thead><tr><th>Page</th><th>Locale</th><th class="r">Human</th><th class="r">Unconf.</th><th class="r">Search crawler</th><th class="r">AI crawler</th><th class="r">AI fetcher</th><th class="r">Other</th><th class="r">.md</th><th class="r">Engaged s</th><th class="r">Outbound</th><th class="r">Out/human</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">Pos.</th></tr></thead><tbody>
+{{range .Data}}<tr><td><a href="/stats/page?{{$.Filter.Query "path" .Path}}">{{.Path}}</a><br><small>{{.Title}}</small></td><td>{{.Locale}}</td><td class="r">{{$.Num .Human}}</td><td class="r">{{$.Num .HumanUnconfirmed}}</td><td class="r">{{$.Num .SearchCrawler}}</td><td class="r">{{$.Num .AiCrawler}}</td><td class="r">{{$.Num .AiFetcher}}</td><td class="r">{{$.Num .Other}}</td><td class="r">{{$.Num .Markdown}}</td><td class="r">{{$.Seconds .AvgEngagedMs}}</td><td class="r">{{$.Num .Outbound}}</td><td class="r">{{printf "%.2f" .OutboundPerHuman}}</td><td class="r">{{$.Num .Impr}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{printf "%.1f" .Position}}</td></tr>
+{{else}}<tr><td colspan="15">No Hits in this range.</td></tr>{{end}}
+</tbody></table>
+{{template "bottom" .}}{{end}}
+
+{{define "page"}}{{template "top" .}}
+{{with .Data}}
+<p><a href="{{.Path}}">{{.Path}}</a> · {{.Title}}</p>
+{{template "chart" ($.Chart "page")}}
+<div class="cols">
+<section><h2>How humans arrived</h2>
+<table><thead><tr><th>Channel</th><th>Referrer</th><th class="r">Hits</th></tr></thead><tbody>
+{{range .Referrers}}<tr><td>{{.Channel}}</td><td>{{.ReferrerHost}}</td><td class="r">{{$.Num .Hits}}</td></tr>{{end}}
+</tbody></table></section>
+<section><h2>Crawlers and agents</h2>
+<table><thead><tr><th>Bot</th><th>Kind</th><th>Verified</th><th class="r">Hits</th></tr></thead><tbody>
+{{range .Bots}}<tr><td>{{.BotName}}</td><td>{{.VisitorKind}}</td><td>{{if .Verified}}yes{{else}}no{{end}}</td><td class="r">{{$.Num .Hits}}</td></tr>{{end}}
+</tbody></table></section>
+</div>
+<section><h2>Search Performance</h2>
+<table><thead><tr><th>Query</th><th>Source</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">Position</th></tr></thead><tbody>
+{{range .Queries}}<tr><td>{{.Query}}</td><td>{{.Source}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{$.Num .Impressions}}</td><td class="r">{{printf "%.1f" .AvgPosition}}</td></tr>{{else}}<tr><td colspan="5">No queries recorded.</td></tr>{{end}}
+</tbody></table></section>
+<section><h2>Page per Content Release</h2>
+<table><thead><tr><th>Release</th><th>Title</th><th>Description</th><th class="r">Words</th></tr></thead><tbody>
+{{range .History}}<tr><td>{{.ReleaseLabel}}</td><td>{{.Title}}</td><td>{{.Description}}</td><td class="r">{{.WordCount}}</td></tr>{{end}}
+</tbody></table></section>
+{{end}}
+{{template "bottom" .}}{{end}}
+
+{{define "releases"}}{{template "top" .}}
+<p class="muted">Per-day rates normalise for how long each Content Release was live. Search figures use each release's calendar window.</p>
+<table class="wide"><thead><tr><th>Release</th><th>Started</th><th class="r">Days</th><th class="r">Humans/day</th><th class="r">Search crawler/day</th><th class="r">AI/day</th><th class="r">From search</th><th class="r">From AI chat</th><th class="r">Visitors</th><th class="r">Outbound (human)</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">Pos.</th></tr></thead><tbody>
+{{range .Data}}<tr><td><strong>{{.ReleaseLabel}}</strong><br><small>{{.Note}}</small></td><td>{{.FirstSeen.Format "2006-01-02"}}</td><td class="r">{{.Days}}</td><td class="r">{{printf "%.1f" .HumansPerDay}}</td><td class="r">{{printf "%.1f" .CrawlersPerDay}}</td><td class="r">{{printf "%.1f" .AIPerDay}}</td><td class="r">{{$.Num .FromSearch}}</td><td class="r">{{$.Num .FromAiChat}}</td><td class="r">{{$.Num .Visitors}}</td><td class="r">{{$.Num .HumanOut}}</td><td class="r">{{$.Num .Impr}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{printf "%.1f" .Position}}</td></tr>{{end}}
+</tbody></table>
+{{template "chart" ($.Chart "timeline")}}
+{{template "bottom" .}}{{end}}
+
+{{define "agents"}}{{template "top" .}}
+{{with .Data}}
+{{template "chart" ($.Chart "agents")}}
+<section><h2>Bots</h2>
+<table class="wide"><thead><tr><th>Bot</th><th>Visitor Kind</th><th>Verified</th><th class="r">Hits</th><th class="r">Paths</th><th class="r">.md</th><th class="r">txt</th><th class="r">xml</th><th>Last seen</th></tr></thead><tbody>
+{{range .Bots}}<tr><td>{{.BotName}}</td><td>{{.VisitorKind}}</td><td>{{if .Verified}}yes{{else}}no{{end}}</td><td class="r">{{$.Num .Hits}}</td><td class="r">{{$.Num .Paths}}</td><td class="r">{{$.Num .Markdown}}</td><td class="r">{{$.Num .Txt}}</td><td class="r">{{$.Num .Xml}}</td><td>{{.LastSeen.Format "2006-01-02 15:04"}}</td></tr>{{else}}<tr><td colspan="9">No crawler Hits in this range.</td></tr>{{end}}
+</tbody></table></section>
+<section><h2>Most-fetched paths</h2>
+<table><thead><tr><th>Path</th><th class="r">Search crawler</th><th class="r">AI crawler</th><th class="r">AI fetcher</th></tr></thead><tbody>
+{{range .Paths}}<tr><td><a href="/stats/page?{{$.Filter.Query "path" .Path}}">{{.Path}}</a></td><td class="r">{{$.Num .SearchCrawler}}</td><td class="r">{{$.Num .AiCrawler}}</td><td class="r">{{$.Num .AiFetcher}}</td></tr>{{end}}
+</tbody></table></section>
+{{end}}
+{{template "bottom" .}}{{end}}
