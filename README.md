@@ -119,13 +119,17 @@ checked again here: the ID token's `roles` must contain `SERVICE_TRIBELT` or `RO
 
 The image embeds `content/`, so a Content Release ships as a new image.
 
-1. Tag the release (`vX.Y.Z`) and run **Publish** (manual until onboarding is complete). It builds
+1. Merge the release PR that release-please keeps open (it collects `feat:` and `fix:` commits;
+   `docs:` and `chore:` alone never open one, so title content changes `feat(content):` or
+   `fix(content):`). Merging it tags `vX.Y.Z` and updates `CHANGELOG.md`.
+2. The tag triggers **Publish** (also runnable by hand with a tag). It builds
    `ghcr.io/jorisjonkers-dev/tribelt` for linux/amd64 and linux/arm64, pins the digest in
-   `platform/images.lock.json` and publishes the deploy artifact from `platform/`.
-2. The first time only, make sure the GHCR package is public (the cluster has no pull secret).
-3. `fleet-infra`'s `auto-bump-first-party-images` workflow opens and auto-merges the pin bump
-   (dispatch it for an instant deploy). The Deployment and IngressRoute are hand-written there,
+   `platform/images.lock.json`, publishes the deploy artifact from `platform/` and sends
+   `image-published` to `fleet-infra`.
+3. The first time only, make sure the GHCR package is public (the cluster has no pull secret).
+4. `fleet-infra`'s `auto-bump-first-party-images` workflow, woken by that dispatch, opens and
+   auto-merges the pin bump. The Deployment and IngressRoute are hand-written there,
    not rendered from `platform/deployment.yml`; secrets arrive via `envFrom`, non-secret values
    are listed in `platform/production.env`.
-4. After Flux applies it, check `https://tribelt.jorisjonkers.dev/healthz` (liveness) and
+5. After Flux applies it, check `https://tribelt.jorisjonkers.dev/healthz` (liveness) and
    `/readyz` (readiness, also probed by gatus), then read the new release label back from `/stats`.

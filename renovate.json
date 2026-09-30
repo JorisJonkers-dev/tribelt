@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>JorisJonkers-dev/renovate-config"],
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "packageRules": [
+    {
+      "description": "One Go toolchain: mise, go.mod and the golang build image move together.",
+      "matchPackageNames": ["go", "golang"],
+      "groupName": "go toolchain"
+    }
+  ]
+}

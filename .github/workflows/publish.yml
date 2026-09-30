@@ -1,15 +1,16 @@
 # Tag-triggered publish flow for deploy-platform service repos.
 #
-# push of a v*.*.* tag drives:
-#   publish-image -> resolve-image-lock -> publish-deploy-artifact
+# push of a v*.*.* tag (authored by release.yml via the App token) drives:
+#   publish-image -> resolve-image-lock -> publish-deploy-artifact -> notify-fleet-infra
 #
 # The image lock crosses the reusable-workflow boundary as an UPLOADED ARTIFACT, never a
 # runner-local path. The image embeds content/, so every Content Release needs a new tag.
 name: Publish
 
-# Manual until platform onboarding (database, secrets, namespace, OIDC client) is complete;
-# then switch this trigger to `push: tags: ['v*.*.*']`.
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
@@ -25,7 +26,7 @@ jobs:
     uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@1efce81af819868fb2f5fd99ee7b04a1275845d8 # v0.18.0
     with:
       image-name: tribelt
-      version: ${{ inputs.tag }}
+      version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       platforms: linux/amd64,linux/arm64
     permissions:
       contents: read
@@ -44,14 +45,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: resolve-image-digest
         id: digest
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE: ghcr.io/jorisjonkers-dev/tribelt
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
@@ -100,9 +101,9 @@ jobs:
     needs: [resolve-image-lock]
     uses: JorisJonkers-dev/github-workflows/.github/workflows/deploy-artifact.yml@1efce81af819868fb2f5fd99ee7b04a1275845d8 # v0.18.0
     with:
-      ref: ${{ inputs.tag }}
+      ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
       artifact-name: tribelt
-      artifact-version: ${{ inputs.tag }}
+      artifact-version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       schema-version: 0.22.0
       apply-bundle: true
       context-ref: ghcr.io/jorisjonkers-dev/cluster-deploy-context-public@sha256:95dc39fc695694c8fb4b0c538d7fe13038d407c7302c3725c98f0496c6a83499
@@ -114,3 +115,50 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+
+  # -- 4. Tell fleet-infra the image exists ---------------------------------
+  # Skips the auto-bump cron's hours of delay. Runs only after the image and deploy
+  # artifact are out; if it fails, the cron still picks the release up.
+  notify-fleet-infra:
+    name: Notify fleet-infra
+    needs: [publish-deploy-artifact]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - name: mint-app-token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # GITHUB_TOKEN cannot dispatch to another repository.
+          owner: JorisJonkers-dev
+          repositories: fleet-infra
+
+      - name: assert-token-minted
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if [ -z "$APP_TOKEN" ]; then
+            echo "E_APP_TOKEN_MISSING: Release App token was not minted." >&2
+            echo "Secrets RELEASE_APP_ID and RELEASE_APP_PRIVATE_KEY must be configured," >&2
+            echo "and the App must be installed on JorisJonkers-dev/fleet-infra." >&2
+            echo "GITHUB_TOKEN fallback is intentionally forbidden." >&2
+            exit 1
+          fi
+          echo "App token minted successfully (token prefix: ${APP_TOKEN:0:4}...)"
+
+      - name: dispatch-image-published
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh api \
+            --method POST \
+            repos/JorisJonkers-dev/fleet-infra/dispatches \
+            -f event_type=image-published \
+            -f "client_payload[service]=tribelt" \
+            -f "client_payload[version]=$TAG"
+          echo "Dispatched image-published to fleet-infra for tribelt $TAG"
