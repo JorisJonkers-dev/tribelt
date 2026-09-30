@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /privacyverklaring
+
+# Allow ChatGPT Search
+User-agent: ChatGPT-User
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+
+
+Sitemap: https://www.tribelt.nl/sitemap.xml

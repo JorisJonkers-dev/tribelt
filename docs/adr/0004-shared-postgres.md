@@ -1,0 +1,3 @@
+# Hits live in the estate's shared Postgres, not SQLite
+
+The app is a single Go binary, which suggests an embedded SQLite file, but the cluster's only storage class is node-pinned `local-path` with no volume backups, and the v2 deployment format cannot guarantee a single writer during rollouts. The shared Postgres already has daily `pg_dumpall` backups, Vault dynamic credentials and a documented per-service database pattern, so `tribelt_db` costs nothing new to operate. The "raw database download" export is still a SQLite file, built on demand from Postgres, so analysis tooling does not need database access.
