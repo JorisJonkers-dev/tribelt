@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.6.0...v0.7.0) (2026-10-01)
+
+
+### Features
+
+* **site:** larger test-site bar and pill, served only to people browsing ([#16](https://github.com/JorisJonkers-dev/tribelt/issues/16)) ([4b3799e](https://github.com/JorisJonkers-dev/tribelt/commit/4b3799e0e020d4efcb70a8ec2357028503face5d))
+
 ## [0.6.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.5.0...v0.6.0) (2026-10-01)
 
 
