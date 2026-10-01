@@ -17,11 +17,16 @@ type Store interface {
 	PageLastMod(ctx context.Context, releaseLabel string) ([]queries.PageLastModRow, error)
 }
 
-// Sync upserts the release and a snapshot of every page, and returns when each page's current text
-// was first published (the sitemap lastmod).
-func Sync(ctx context.Context, s Store, c *content.Content) (map[string]time.Time, error) {
+// Sync upserts the release (with the App Version serving it and its tags) and a snapshot of every page,
+// and returns when each page's current text was first published (the sitemap lastmod).
+func Sync(ctx context.Context, s Store, c *content.Content, appVersion string) (map[string]time.Time, error) {
 	label := c.Site.Release.Label
-	if _, err := s.UpsertRelease(ctx, queries.UpsertReleaseParams{Label: label, Note: c.Site.Release.Note, ContentHash: c.Hash}); err != nil {
+	tags := c.Site.Release.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	rel := queries.UpsertReleaseParams{Label: label, Note: c.Site.Release.Note, ContentHash: c.Hash, AppVersion: appVersion, Tags: tags}
+	if _, err := s.UpsertRelease(ctx, rel); err != nil {
 		return nil, fmt.Errorf("release: upsert %s: %w", label, err)
 	}
 	for _, p := range c.Pages {

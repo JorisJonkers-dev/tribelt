@@ -37,6 +37,8 @@ type Hit struct {
 	Internal        bool
 	BeaconConfirmed bool
 	EngagedMs       *int64
+	Resource        string
+	AppVersion      string
 }
 
 type OutboundClick struct {
@@ -54,6 +56,7 @@ type OutboundClick struct {
 	DailyHash    string
 	Internal     bool
 	Country      *string
+	AppVersion   string
 }
 
 type Page struct {
@@ -76,6 +79,9 @@ type Release struct {
 	ContentHash string
 	FirstSeenAt time.Time
 	LastSeenAt  time.Time
+	AppVersion  string
+	AppVersions []string
+	Tags        []string
 }
 
 type SearchPerformance struct {

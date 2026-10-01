@@ -20,14 +20,15 @@ RUN set -eu; \
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
-RUN tailwindcss --input web/css/site.css --output web/static/site.css --minify
+RUN tailwindcss --input web/css/site.css --output web/static/site.css --minify \
+ && tailwindcss --input web/css/stats.css --output web/static/stats.css --minify
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=dev
+# The App Version is embedded from .release-please-manifest.json, so no version build argument is needed.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/tribelt ./cmd/tribelt
+    go build -trimpath -ldflags "-s -w" -o /out/tribelt ./cmd/tribelt
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/tribelt /tribelt

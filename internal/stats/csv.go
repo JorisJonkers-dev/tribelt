@@ -52,6 +52,8 @@ func (s *Service) csv(w http.ResponseWriter, r *http.Request) {
 		rows, err = s.releasesCSV(r.Context(), f)
 	case "agents":
 		rows, err = s.agentsCSV(r.Context(), f)
+	case "search":
+		rows, err = s.searchCSV(r.Context(), f)
 	case "hits":
 		s.hitsCSV(w, r, f)
 		return
@@ -94,7 +96,7 @@ func (s *Service) dailyCSV(ctx context.Context, f Filter) ([][]string, error) {
 }
 
 func (s *Service) pagesCSV(ctx context.Context, f Filter) ([][]string, error) {
-	pages, err := s.Pages(ctx, f)
+	pages, err := s.pageRows(ctx, f)
 	if err != nil {
 		return nil, err
 	}
@@ -106,13 +108,14 @@ func (s *Service) pagesCSV(ctx context.Context, f Filter) ([][]string, error) {
 }
 
 func (s *Service) releasesCSV(ctx context.Context, f Filter) ([][]string, error) {
-	rels, err := s.Releases(ctx, f)
+	rels, err := s.releaseRows(ctx, f)
 	if err != nil {
 		return nil, err
 	}
-	rows := [][]string{{"release", "note", "first_seen", "days", "human", "human_unconfirmed", "search_crawler", "ai_crawler", "ai_fetcher", "other", "from_search", "from_ai_chat", "visitors", "outbound", "human_outbound", "impressions", "clicks", "avg_position", "humans_per_day", "search_crawler_per_day", "ai_per_day"}}
+	rows := [][]string{{"release", "note", "tags", "app_version", "app_versions", "first_seen", "days", "human", "human_unconfirmed", "search_crawler", "ai_crawler", "ai_fetcher", "other", "from_search", "from_ai_chat", "markdown", "llms", "visitors", "outbound", "human_outbound", "impressions", "clicks", "avg_position", "humans_per_day", "search_crawler_per_day", "ai_per_day"}}
 	for _, r := range rels {
-		rows = append(rows, []string{r.ReleaseLabel, r.Note, r.FirstSeen.Format(time.RFC3339), i64(r.Days), i64(r.Human), i64(r.HumanUnconfirmed), i64(r.SearchCrawler), i64(r.AiCrawler), i64(r.AiFetcher), i64(r.Other), i64(r.FromSearch), i64(r.FromAiChat), i64(r.Visitors), i64(r.Outbound), i64(r.HumanOut), i64(r.Impr), i64(r.Clicks), f64(r.Position), f64(r.HumansPerDay), f64(r.CrawlersPerDay), f64(r.AIPerDay)})
+		rel := r.Release
+		rows = append(rows, []string{r.ReleaseLabel, rel.Note, TagsText(rel.Tags), rel.AppVersion, TagsText(rel.AppVersions), rel.FirstSeenAt.Format(time.RFC3339), i64(r.Days), i64(r.Human), i64(r.HumanUnconfirmed), i64(r.SearchCrawler), i64(r.AiCrawler), i64(r.AiFetcher), i64(r.Other), i64(r.FromSearch), i64(r.FromAiChat), i64(r.Markdown), i64(r.Llms), i64(r.Visitors), i64(r.Outbound), i64(r.HumanOut), i64(r.Impr), i64(r.Clicks), f64(r.Position), f64(r.HumansPerDay), f64(r.CrawlersPerDay), f64(r.AIPerDay)})
 	}
 	return rows, nil
 }
@@ -122,9 +125,21 @@ func (s *Service) agentsCSV(ctx context.Context, f Filter) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows := [][]string{{"bot_name", "visitor_kind", "verified", "hits", "paths", "markdown", "txt", "xml", "last_seen"}}
+	rows := [][]string{{"bot_name", "operator", "visitor_kind", "hits", "verified_hits", "checked_hits", "pages", "html", "markdown", "robots", "llms", "sitemap", "other", "last_seen"}}
 	for _, b := range a.Bots {
-		rows = append(rows, []string{b.BotName, b.VisitorKind, strconv.FormatBool(b.Verified), i64(b.Hits), i64(b.Paths), i64(b.Markdown), i64(b.Txt), i64(b.Xml), b.LastSeen.Format(time.RFC3339)})
+		rows = append(rows, []string{b.BotName, visits.Operator(b.BotName), b.VisitorKind, i64(b.Hits), i64(b.Verified), i64(b.Checked), i64(b.Pages), i64(b.Page), i64(b.Markdown), i64(b.Robots), i64(b.Llms), i64(b.Sitemap), i64(b.Other), b.LastSeen.Format(time.RFC3339)})
+	}
+	return rows, nil
+}
+
+func (s *Service) searchCSV(ctx context.Context, f Filter) ([][]string, error) {
+	q, err := s.Q.TopQueries(ctx, queries.TopQueriesParams{FromDay: f.Start(), ToDay: f.End()})
+	if err != nil {
+		return nil, err
+	}
+	rows := [][]string{{"query", "source", "clicks", "impressions", "avg_position"}}
+	for _, r := range q {
+		rows = append(rows, []string{r.Query, r.Source, i64(r.Clicks), i64(r.Impressions), f64(r.AvgPosition)})
 	}
 	return rows, nil
 }
@@ -134,7 +149,7 @@ func HitColumns() []string {
 	return []string{
 		"id", "ts", "path", "page_id", "locale", "release_label", "format", "status", "visitor_kind", "bot_name", "verified",
 		"arrival_channel", "referrer_host", "referrer_name", "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
-		"country", "user_agent", "visitor_id", "daily_hash", "internal", "beacon_confirmed", "engaged_ms",
+		"country", "user_agent", "visitor_id", "daily_hash", "internal", "beacon_confirmed", "engaged_ms", "resource", "app_version",
 	}
 }
 
@@ -166,7 +181,7 @@ func hitRecord(h queries.Hit) []string {
 		h.ID.String(), h.Ts.UTC().Format(time.RFC3339Nano), h.Path, str(h.PageID), str(h.Locale), h.ReleaseLabel, h.Format,
 		i64(h.Status), h.VisitorKind, str(h.BotName), boolp(h.Verified), str(h.ArrivalChannel), str(h.ReferrerHost), str(h.ReferrerName),
 		str(h.UtmSource), str(h.UtmMedium), str(h.UtmCampaign), str(h.UtmTerm), str(h.UtmContent), str(h.Country), h.UserAgent,
-		str(h.VisitorID), h.DailyHash, strconv.FormatBool(h.Internal), strconv.FormatBool(h.BeaconConfirmed), engaged,
+		str(h.VisitorID), h.DailyHash, strconv.FormatBool(h.Internal), strconv.FormatBool(h.BeaconConfirmed), engaged, h.Resource, h.AppVersion,
 	}
 }
 

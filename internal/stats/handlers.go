@@ -25,23 +25,65 @@ type DB interface {
 
 // Service renders the stats views.
 type Service struct {
-	Q       Querier
-	DB      DB
-	Log     *slog.Logger
-	Now     func() time.Time
-	Release string
+	Q   Querier
+	DB  DB
+	Log *slog.Logger
+	Now func() time.Time
+	// Release and AppVersion are what this process serves; the header pill shows both.
+	Release, AppVersion string
+	// PageCount is the number of Mirror Pages in the running Content Release.
+	PageCount int
 	// Title returns the current title of a Mirror Page path.
 	Title func(path string) string
 	// ViewerName returns the signed-in Stats Viewer's display name.
-	ViewerName    func(r *http.Request) string
-	SearchEnabled bool
-	CSS, ChartJS  string
-	tmpl          *template.Template
+	ViewerName   func(r *http.Request) string
+	Search       SearchSources
+	CSS, ChartJS string
+	tmpl         *template.Template
+}
+
+func funcs() template.FuncMap {
+	return template.FuncMap{
+		"num":       num,
+		"one":       one,
+		"two":       func(f float64) string { return strconv.FormatFloat(f, 'f', 2, 64) },
+		"f1":        func(f float64) string { return strconv.FormatFloat(f, 'f', 1, 64) },
+		"kindLabel": KindLabel,
+		"kindDot":   KindDot,
+		"channel":   ChannelLabel,
+		"versions":  versionsText,
+		"source":    sourceName,
+		"date":      func(t time.Time) string { return t.In(amsterdam()).Format("2 Jan 2006") },
+		"heading":   func(title, sub string) struct{ Title, Sub string } { return struct{ Title, Sub string }{title, sub} },
+		"pageTable": func(p page, rows []PageRow, full bool) pageTable {
+			return pageTable{Filter: p.Filter, Rows: rows, Full: full, Days: p.Filter.Len()}
+		},
+		"searchPanel":   func(p page, s SearchSummary) searchPanel { return searchPanel{Filter: p.Filter, Search: s} },
+		"searchSummary": func(src SearchSources) SearchSummary { return SearchSummary{Sources: src} },
+		"side":          func(label string, r *ReleaseRow) releaseSide { return releaseSide{Side: label, Row: r} },
+	}
+}
+
+type pageTable struct {
+	Filter Filter
+	Rows   []PageRow
+	Full   bool
+	Days   int
+}
+
+type searchPanel struct {
+	Filter Filter
+	Search SearchSummary
+}
+
+type releaseSide struct {
+	Side string
+	Row  *ReleaseRow
 }
 
 // Init parses the stats templates.
 func (s *Service) Init(templates fs.FS) error {
-	t, err := template.ParseFS(templates, "stats.html")
+	t, err := template.New("stats.html").Funcs(funcs()).ParseFS(templates, "stats.html")
 	if err != nil {
 		return err
 	}
@@ -65,6 +107,7 @@ func (s *Service) Routes(mux *http.ServeMux, guard func(http.Handler) http.Handl
 	h("GET /stats/page", s.view("page"))
 	h("GET /stats/releases", s.view("releases"))
 	h("GET /stats/agents", s.view("agents"))
+	h("GET /stats/search", s.view("search"))
 	h("GET /stats/chart/{name}", s.chartSVG)
 	h("GET /stats/export.sqlite", s.exportSQLite)
 	h("GET /stats/{file}", s.csv)
@@ -80,122 +123,84 @@ func noStore(next http.HandlerFunc) http.Handler {
 
 // page is the template data of every view.
 type page struct {
-	Title, View, Release, Viewer, CSS, ChartJS string
-	Filter                                     Filter
-	Locales                                    []string
-	Releases                                   []queries.Release
-	SearchEnabled                              bool
-	Data                                       any
-	charts                                     map[string]string
+	Title, View, Release, AppVersion, Viewer, Initials, CSS, JS string
+	Filter                                                      Filter
+	Ranges, Locales, Tabs                                       []Tab
+	Releases                                                    []queries.Release
+	Versions, Tags                                              []string
+	Data                                                        any
 }
 
-// Num formats a count with thin grouping.
-func (page) Num(n int64) string {
-	s := strconv.FormatInt(n, 10)
-	for i := len(s) - 3; i > 0 && s[i-1] != '-'; i -= 3 {
-		s = s[:i] + "," + s[i:]
-	}
-	return s
-}
+// Pill is the header's "v0.3.0 · v1-baseline".
+func (p page) Pill() string { return Summary(p.AppVersion, p.Release) }
 
-// Seconds formats milliseconds as seconds.
-func (page) Seconds(ms int64) string { return strconv.FormatFloat(float64(ms)/1000, 'f', 1, 64) }
-
-// SumOutbound totals Outbound Clicks.
-func (page) SumOutbound(rows []queries.OutboundTotalsRow) int64 {
-	var n int64
-	for _, r := range rows {
-		n += r.Clicks
-	}
-	return n
-}
-
-type chartView struct {
-	SVG           template.HTML
-	SVGHref, Name string
-}
-
-// Chart embeds a rendered chart with its download links.
-func (p page) Chart(name string) chartView {
-	return chartView{
-		SVG:     template.HTML(p.charts[name]), //nolint:gosec // built by LineChart/BarChart, which escape all text
-		SVGHref: "/stats/chart/" + name + ".svg?" + p.Filter.Query(),
-		Name:    name + "-" + p.Filter.From.Format(time.DateOnly) + "-" + p.Filter.To.Format(time.DateOnly),
-	}
-}
-
-func (s *Service) load(ctx context.Context, view string, f Filter) (any, map[string]string, error) {
-	charts := map[string]string{}
+func (s *Service) load(ctx context.Context, view string, f Filter) (any, error) {
 	switch view {
 	case "overview":
-		o, err := s.Overview(ctx, f)
-		if err != nil {
-			return nil, nil, err
-		}
-		charts["timeline"] = kindTimeline("Hits per day by Visitor Kind", o.Days, o.ByKind, o.Markers, visits.Kinds())
-		var bars []Bar
-		for _, c := range o.Channels {
-			bars = append(bars, Bar{Label: c.Channel, Value: c.Hits, Color: KindColor(c.Channel)})
-		}
-		charts["channels"] = BarChart("Human page views by Arrival Channel", bars)
-		return o, charts, nil
+		return s.Overview(ctx, f)
 	case "pages":
-		p, err := s.Pages(ctx, f)
-		return p, charts, err
+		return s.Pages(ctx, f, 0)
 	case "page":
-		d, err := s.Page(ctx, f)
-		if err != nil {
-			return nil, nil, err
-		}
-		charts["page"] = kindTimeline("Hits per day: "+f.Path, d.Days, d.ByKind, d.Markers, visits.Kinds())
-		return d, charts, nil
+		return s.Page(ctx, f)
 	case "releases":
-		r, err := s.Releases(ctx, f)
-		if err != nil {
-			return nil, nil, err
-		}
-		days, by, err := s.daily(ctx, f)
-		if err != nil {
-			return nil, nil, err
-		}
-		m, _, err := s.markers(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-		charts["timeline"] = kindTimeline("Hits per day with Content Releases", days, by, m, visits.Kinds())
-		return r, charts, nil
+		return s.Releases(ctx, f)
+	case "search":
+		return s.SearchPerformance(ctx, f)
 	default:
-		a, err := s.Agents(ctx, f)
-		if err != nil {
-			return nil, nil, err
-		}
-		charts["agents"] = kindTimeline("Crawler and agent Hits per day", a.Days, a.ByKind, a.Markers,
-			[]visits.Kind{visits.KindSearchCrawler, visits.KindAICrawler, visits.KindAIFetcher, visits.KindSEOTool, visits.KindOtherBot})
-		return a, charts, nil
+		return s.Agents(ctx, f)
 	}
-}
-
-func kindTimeline(title string, days []time.Time, by map[string][]int64, markers []Marker, kinds []visits.Kind) string {
-	var series []Series
-	for _, k := range kinds {
-		series = append(series, Series{Name: string(k), Color: KindColor(string(k)), Values: by[string(k)]})
-	}
-	return LineChart(title, days, series, markers)
 }
 
 func viewTitle(view string) string {
-	switch view {
-	case "pages":
-		return "Per page"
-	case "page":
-		return "Page detail"
-	case "releases":
-		return "Release compare"
-	case "agents":
-		return "AI & crawlers"
-	default:
-		return "Overview"
+	return map[string]string{
+		"overview": "Overview", "pages": "Pages", "page": "Page detail", "releases": "Releases", "agents": "AI & crawlers", "search": "Search",
+	}[view]
+}
+
+func tabs(view string, f Filter) []Tab {
+	q := "?" + f.Query("path", "", "q", "", "kind", "", "a", "", "b", "")
+	var out []Tab
+	for _, t := range []struct{ view, label, href string }{
+		{"overview", "Overview", "/stats"},
+		{"pages", "Pages", "/stats/pages"},
+		{"releases", "Releases", "/stats/releases"},
+		{"agents", "AI & crawlers", "/stats/agents"},
+		{"search", "Search", "/stats/search"},
+	} {
+		on := t.view == view || (t.view == "pages" && view == "page")
+		out = append(out, Tab{Label: t.label, Href: t.href + q, On: on})
 	}
+	return out
+}
+
+func (s *Service) chrome(ctx context.Context, r *http.Request, view string, f Filter) (page, error) {
+	p := page{
+		Title: viewTitle(view), View: view, Release: s.Release, AppVersion: s.AppVersion, CSS: s.CSS, JS: s.ChartJS, Filter: f,
+		Tabs: tabs(view, f),
+	}
+	for _, n := range []int{7, 30, 90} {
+		label := strconv.Itoa(n) + "d"
+		p.Ranges = append(p.Ranges, Tab{Label: label, Href: "?" + f.PresetQuery(n), On: f.Preset() == label})
+	}
+	for _, l := range []string{"", "nl", "en", "de"} {
+		p.Locales = append(p.Locales, Tab{Label: strings.ToUpper(orDefault(l, "All")), Href: "?" + f.Query("locale", l), On: f.Locale == l})
+	}
+	p.Locales[0].Label = "All"
+	var err error
+	if p.Releases, err = s.Q.ListReleases(ctx); err != nil {
+		return p, err
+	}
+	if p.Versions, err = s.Q.AppVersions(ctx); err != nil {
+		return p, err
+	}
+	if p.Tags, err = s.Q.ReleaseTags(ctx); err != nil {
+		return p, err
+	}
+	if s.ViewerName != nil {
+		p.Viewer = s.ViewerName(r)
+		p.Initials = initials(p.Viewer)
+	}
+	return p, nil
 }
 
 func (s *Service) view(name string) http.HandlerFunc {
@@ -208,22 +213,14 @@ func (s *Service) view(name string) http.HandlerFunc {
 		if name != "page" {
 			f.Path = ""
 		}
-		data, charts, err := s.load(r.Context(), name, f)
+		p, err := s.chrome(r.Context(), r, name, f)
 		if err != nil {
 			s.fail(w, err)
 			return
 		}
-		rels, err := s.Q.ListReleases(r.Context())
-		if err != nil {
+		if p.Data, err = s.load(r.Context(), name, f); err != nil {
 			s.fail(w, err)
 			return
-		}
-		p := page{
-			Title: viewTitle(name), View: name, Release: s.Release, CSS: s.CSS, ChartJS: s.ChartJS, Filter: f,
-			Locales: []string{"nl", "en", "de"}, Releases: rels, SearchEnabled: s.SearchEnabled, Data: data, charts: charts,
-		}
-		if s.ViewerName != nil {
-			p.Viewer = s.ViewerName(r)
 		}
 		var buf bytes.Buffer
 		if err := s.tmpl.ExecuteTemplate(&buf, name, p); err != nil {
@@ -235,22 +232,50 @@ func (s *Service) view(name string) http.HandlerFunc {
 	}
 }
 
+// chartSVG serves one chart as a standalone SVG, for download and the client-side PNG export.
 func (s *Service) chartSVG(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSuffix(r.PathValue("name"), ".svg")
 	f := ParseFilter(r.URL.Query(), s.Now())
-	view := map[string]string{"timeline": "overview", "channels": "overview", "page": "page", "agents": "agents"}[name]
-	if view == "" || (view == "page" && f.Path == "") {
-		http.NotFound(w, r)
-		return
+	if name != "page" {
+		f.Path = ""
 	}
-	_, charts, err := s.load(r.Context(), view, f)
+	svg, err := s.chart(r.Context(), name, f)
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
+	if svg == "" {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.svg"`, name, f.To.Format(time.DateOnly)))
-	_, _ = w.Write([]byte(charts[name])) //nolint:gosec // charts escape every text node
+	_, _ = w.Write([]byte(svg)) //nolint:gosec // charts escape every text node
+}
+
+func (s *Service) chart(ctx context.Context, name string, f Filter) (string, error) {
+	kinds := map[string][]visits.Kind{"timeline": visits.Kinds(), "releases": visits.Kinds(), "page": visits.Kinds(), "agents": botKinds()}
+	titles := map[string]string{
+		"timeline": "Hits per day by Visitor Kind", "releases": "Hits per day with Content Releases", "page": "Hits per day: " + f.Path,
+		"agents": "Crawler and agent Hits per day",
+	}
+	switch {
+	case name == "page" && f.Path == "":
+		return "", nil
+	case kinds[name] != nil:
+		_, d, err := s.kindTimeline(ctx, name, f, kinds[name])
+		if err != nil {
+			return "", err
+		}
+		return TimelineSVG(titles[name]+" · "+f.RangeText(), d), nil
+	case name == "channels":
+		rows, err := s.arrive(ctx, f)
+		return BarsSVG("Human page views by Arrival Channel · "+f.RangeText(), rows), err
+	case name == "search":
+		days, series, err := s.searchDays(ctx, f)
+		return DaySVG("Search Performance per day · "+f.RangeText(), days, series), err
+	}
+	return "", nil
 }
 
 func (s *Service) fail(w http.ResponseWriter, err error) {

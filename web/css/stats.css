@@ -1,0 +1,231 @@
+/* Stats stylesheet. Built by the Tailwind v4 standalone CLI into web/static/stats.css (task css). */
+@import "tailwindcss" source(none);
+@source "../templates/stats.html";
+@source "../../internal/stats/*.go";
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url(/static/fonts/plex-sans-400.woff2) format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url(/static/fonts/plex-sans-500.woff2) format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url(/static/fonts/plex-sans-600.woff2) format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url(/static/fonts/plex-sans-700.woff2) format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url(/static/fonts/plex-mono-400.woff2) format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url(/static/fonts/plex-mono-500.woff2) format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@theme {
+  --color-bg: #0f1113;
+  --color-panel: #171a1d;
+  --color-raised: #1b1f22;
+  --color-line: #2a2f34;
+  --color-hair: #23272b;
+  --color-rule: #202428;
+  --color-strong: #3a4046;
+  --color-track: #262b30;
+  --color-avatar: #2f353b;
+  --color-ink: #ecedee;
+  --color-muted: #9ba1a6;
+  --color-off: #8b9196;
+  --color-dim: #555c62;
+  --color-accent: #f07a3e;
+  --color-link: #f59a68;
+  --color-link-hover: #ffc2a0;
+  --color-up-bg: #12352b;
+  --color-up: #6fd3ae;
+  --color-down-bg: #3a1f12;
+  --color-down: #f59a68;
+  --color-note: #26190f;
+  --color-warn-bg: #33270f;
+  --color-warn: #f2c46b;
+  --color-live: #4cc39b;
+  --color-k-human: #4cc39b;
+  --color-k-unconfirmed: #2e7a64;
+  --color-k-search: #5b8def;
+  --color-k-aicrawler: #f07a3e;
+  --color-k-aifetcher: #f6c08a;
+  --color-k-seo: #a58bd6;
+  --color-k-other: #6b7178;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font: 400 14px/1.45 var(--font-sans);
+  }
+
+  a {
+    color: var(--color-link);
+  }
+
+  a:hover {
+    color: var(--color-link-hover);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-link);
+    outline-offset: 2px;
+  }
+
+  summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-[14px] border border-line bg-panel;
+  }
+
+  .h2 {
+    @apply m-0 text-[17px] font-semibold;
+  }
+
+  .sub {
+    @apply text-[13px] text-muted;
+  }
+
+  .seg {
+    @apply flex shrink-0 rounded-[10px] border border-line bg-panel p-[3px];
+  }
+
+  .seg-dark {
+    @apply flex shrink-0 rounded-[10px] border border-line bg-bg p-[3px];
+  }
+
+  .seg-btn {
+    @apply flex min-h-[34px] items-center rounded-[7px] px-3 text-[13px] font-medium whitespace-nowrap text-muted no-underline hover:text-ink;
+  }
+
+  .seg-btn[aria-current="true"],
+  details[open] > .seg-btn {
+    @apply bg-ink text-panel;
+  }
+
+  .btn-sm {
+    @apply inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-line bg-panel px-2.5 font-sans text-xs text-ink no-underline hover:border-strong hover:text-ink;
+  }
+
+  .btn-light {
+    @apply inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-[10px] border-0 bg-ink px-3.5 font-sans text-[13px] font-medium text-bg no-underline hover:bg-white hover:text-bg;
+  }
+
+  .chip {
+    @apply flex min-h-[34px] items-center gap-2 rounded-full border border-strong bg-panel px-3 text-[13px] text-ink no-underline hover:text-ink;
+  }
+
+  .chip[data-off] {
+    @apply border-line bg-raised text-off line-through hover:text-ink;
+  }
+
+  .dot {
+    @apply inline-block size-2.5 shrink-0 rounded-[3px];
+  }
+
+  .chip[data-off] .dot {
+    @apply bg-strong;
+  }
+
+  .field {
+    @apply flex h-10 items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-[13px];
+  }
+
+  .field select,
+  .field input {
+    @apply border-0 bg-transparent font-sans text-[13px] font-medium text-ink;
+  }
+
+  .field select {
+    field-sizing: content;
+  }
+
+  .field select option {
+    @apply bg-panel;
+  }
+
+  .thead {
+    @apply gap-3 border-y border-hair bg-raised px-4 py-2.5 text-xs font-medium text-muted sm:px-6;
+  }
+
+  .trow {
+    @apply items-center gap-3 border-b border-rule px-4 py-3 sm:px-6;
+  }
+
+  .tag {
+    @apply inline-block rounded-md bg-track px-[7px] py-[3px] font-mono text-[11px] font-medium text-ink;
+  }
+
+  .pill-ok {
+    @apply rounded-full bg-up-bg px-2 py-[3px] font-mono text-xs font-medium whitespace-nowrap text-up;
+  }
+
+  .pill-partial {
+    @apply rounded-full bg-warn-bg px-2 py-[3px] font-mono text-xs font-medium whitespace-nowrap text-warn;
+  }
+
+  .pill-none {
+    @apply rounded-full bg-track px-2 py-[3px] font-mono text-xs font-medium whitespace-nowrap text-muted;
+  }
+
+  .menu {
+    @apply absolute right-0 z-20 mt-2 flex w-72 flex-col gap-1 rounded-xl border border-line bg-panel p-2 shadow-2xl shadow-black/60;
+  }
+
+  .menu a {
+    @apply flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-[13px] text-ink no-underline hover:bg-raised;
+  }
+
+  .track {
+    @apply block h-2.5 w-full overflow-hidden rounded-full;
+  }
+}
+
+.js .js-hide {
+  display: none;
+}

@@ -28,9 +28,6 @@ import (
 	"github.com/JorisJonkers-dev/tribelt/web"
 )
 
-// version is set at build time with -ldflags "-X main.version=…".
-var version = "dev"
-
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err := run(os.Args[1:], logger); err != nil {
@@ -99,7 +96,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	logger.Info("content loaded", "release", c.Site.Release.Label, "pages", len(c.Pages), "hash", c.Hash, "version", version)
+	version := tribelt.Version()
+	logger.Info("content loaded", "release", c.Site.Release.Label, "tags", c.Site.Release.Tags, "pages", len(c.Pages), "hash", c.Hash, "version", version)
 	if cfg.AutoMigrate {
 		if err := migrate(ctx, cfg, logger); err != nil {
 			return err
@@ -110,7 +108,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	defer store.Close()
-	lastMod, err := release.Sync(ctx, store.Q(), c)
+	lastMod, err := release.Sync(ctx, store.Q(), c, version)
 	if err != nil {
 		return err
 	}
@@ -130,11 +128,12 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	tracker.AppVersion = version
 	mux := http.NewServeMux()
 	httpx.Health(mux, func(context.Context) error { return nil })
 	assets := site.Assets(built)
 	mux.Handle("GET /static/", assets)
-	mux.Handle("GET /images/", assets)
+	mux.Handle("GET /images/", tracker.Images(assets))
 	mux.HandleFunc("POST /b", tracker.Beacon)
 	mux.HandleFunc("GET /go", tracker.Go(built.GoAllowed))
 	pages := &site.Handler{Built: built}
@@ -144,7 +143,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	mux.Handle("/", tracker.Middleware(pages))
 	searchOn := startSearchImport(ctx, cfg, store, logger)
 	if statsOn {
-		if err := mountStats(mux, gate, store, c, built, searchOn, logger); err != nil {
+		if err := mountStats(mux, gate, store, c, built, searchOn, version, logger); err != nil {
 			return err
 		}
 	} else {
@@ -175,17 +174,18 @@ func newTracker(cfg config.Config, c *content.Content, rec *hits.Recorder, gate 
 	return t, nil
 }
 
-func mountStats(mux *http.ServeMux, gate oidc.Gate, store *pg.Store, c *content.Content, built *content.Built, searchOn bool, logger *slog.Logger) error {
+func mountStats(mux *http.ServeMux, gate oidc.Gate, store *pg.Store, c *content.Content, built *content.Built, search stats.SearchSources, version string, logger *slog.Logger) error {
 	svc := &stats.Service{
-		Q: store.Q(), DB: store.Pool(), Log: logger, Now: time.Now, Release: c.Site.Release.Label,
+		Q: store.Q(), DB: store.Pool(), Log: logger, Now: time.Now, Release: c.Site.Release.Label, AppVersion: version,
+		PageCount: len(c.Pages),
 		Title: func(p string) string {
 			if page, ok := c.ByPath[p]; ok {
 				return page.Title
 			}
 			return ""
 		},
-		ViewerName:    func(r *http.Request) string { v, _ := gate.Viewer(r); return v.Name },
-		SearchEnabled: searchOn, CSS: built.AssetURL("/static/stats.css"), ChartJS: built.AssetURL("/static/chart.js"),
+		ViewerName: func(r *http.Request) string { v, _ := gate.Viewer(r); return v.Name },
+		Search:     search, CSS: built.AssetURL("/static/stats.css"), ChartJS: built.AssetURL("/static/chart.js"),
 	}
 	if err := svc.Init(sub(web.Templates, "templates")); err != nil {
 		return err
@@ -245,24 +245,27 @@ func newGate(ctx context.Context, cfg config.Config, logger *slog.Logger) (gate 
 	}
 }
 
-func startSearchImport(ctx context.Context, cfg config.Config, store *pg.Store, logger *slog.Logger) bool {
+func startSearchImport(ctx context.Context, cfg config.Config, store *pg.Store, logger *slog.Logger) stats.SearchSources {
 	var sources []stats.Source
+	var on stats.SearchSources
 	if cfg.GSCServiceAccountJSON != "" && cfg.GSCSiteURL != "" {
 		gsc, err := stats.NewGSC(ctx, []byte(cfg.GSCServiceAccountJSON), cfg.GSCSiteURL)
 		if err != nil {
 			logger.Error("search console import disabled", "error", err)
 		} else {
 			sources = append(sources, gsc)
+			on.Google = true
 		}
 	}
 	if cfg.BingAPIKey != "" && cfg.BingSiteURL != "" {
 		sources = append(sources, &stats.Bing{HTTP: &http.Client{Timeout: time.Minute}, BaseURL: "https://ssl.bing.com", SiteURL: cfg.BingSiteURL, APIKey: cfg.BingAPIKey})
+		on.Bing = true
 	}
 	if len(sources) == 0 {
 		logger.Info("search performance import disabled: no credentials")
-		return false
+		return on
 	}
 	im := &stats.Importer{Sources: sources, Store: store.Q(), Log: logger, Now: time.Now, Lookback: 10}
 	go im.Run(ctx, time.Minute, 24*time.Hour)
-	return true
+	return on
 }

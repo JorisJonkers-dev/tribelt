@@ -1,0 +1,1 @@
+release: { label: v3-faq, note: "FAQ schema on every product page", tags: [faq-schema] }

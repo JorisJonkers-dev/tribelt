@@ -45,10 +45,12 @@ tasks:
     cmd: actionlint
 
   css:
-    desc: Build the public stylesheet with the Tailwind standalone CLI (web/css -> web/static/site.css)
-    sources: [web/css/*.css, web/templates/public.html]
-    generates: [web/static/site.css]
-    cmd: tailwindcss --input web/css/site.css --output web/static/site.css --minify
+    desc: Build the public and stats stylesheets with the Tailwind standalone CLI (web/css -> web/static)
+    sources: [web/css/*.css, web/templates/*.html, internal/stats/*.go]
+    generates: [web/static/site.css, web/static/stats.css]
+    cmds:
+      - tailwindcss --input web/css/site.css --output web/static/site.css --minify
+      - tailwindcss --input web/css/stats.css --output web/static/stats.css --minify
 
   vet:
     desc: go vet

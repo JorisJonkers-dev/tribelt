@@ -4,145 +4,737 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
 <title>{{.Title}} · Tribelt mirror stats</title>
 <link rel="icon" href="data:,">
+<link rel="preload" href="/static/fonts/plex-sans-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{{.CSS}}">
-<script src="{{.ChartJS}}" defer></script>
+<script src="{{.JS}}" defer></script>
 </head>
-<body class="stats">
-<header class="stats-head">
-  <div class="wrap bar">
-    <strong>Tribelt mirror · stats</strong>
-    <span class="release">Current Content Release: <code>{{.Release}}</code></span>
-    <form method="post" action="/auth/logout"><span class="who">{{.Viewer}}</span> <button type="submit">Sign out</button></form>
+<body>
+<a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink focus:px-3 focus:py-2 focus:text-bg">Skip to the statistics</a>
+<header class="border-b border-line bg-panel">
+  <div class="mx-auto flex max-w-[1360px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8 lg:h-16 lg:py-0">
+    <div class="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2">
+      <a href="/stats?{{.Filter.Query "path" "" "q" "" "kind" "" "a" "" "b" ""}}" class="flex items-center gap-3.5 text-ink no-underline hover:text-ink">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F1113" stroke-width="2.2" stroke-linecap="round"><path d="M4 18V11"/><path d="M10 18V6"/><path d="M16 18v-4"/><path d="M21 18H3"/></svg>
+        </span>
+        <span class="flex flex-col leading-[1.15]">
+          <span class="text-[15px] font-semibold">Tribelt mirror</span>
+          <span class="text-xs text-muted">Discovery stats · student project</span>
+        </span>
+      </a>
+      <span class="flex items-center gap-2 rounded-full border border-line bg-raised py-[5px] pr-2.5 pl-2 lg:ml-3" title="App Version · Content Release this process serves">
+        <span class="size-2 rounded-full bg-live" aria-hidden="true"></span>
+        <span class="text-xs text-muted">Live release</span>
+        <span class="font-mono text-xs font-medium">{{.Pill}}</span>
+      </span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-1.5 px-2.5 py-2 text-[13px] no-underline">View site
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+      </a>
+      <span class="hidden h-6 w-px bg-line sm:block" aria-hidden="true"></span>
+      <span class="flex items-center gap-2.5">
+        <span class="flex size-8 items-center justify-center rounded-full bg-avatar text-[13px] font-semibold" aria-hidden="true">{{.Initials}}</span>
+        <span class="hidden text-[13px] font-medium sm:inline">{{.Viewer}}</span>
+      </span>
+      <form method="post" action="/auth/logout" class="m-0">
+        <button type="submit" class="min-h-9 cursor-pointer rounded-lg border border-strong bg-panel px-3 font-sans text-[13px] text-ink hover:border-muted">Sign out</button>
+      </form>
+    </div>
   </div>
-  <nav class="wrap tabs" aria-label="Views">
-    <a href="/stats?{{.Filter.Query "path" ""}}"{{if eq .View "overview"}} aria-current="page"{{end}}>Overview</a>
-    <a href="/stats/pages?{{.Filter.Query "path" ""}}"{{if or (eq .View "pages") (eq .View "page")}} aria-current="page"{{end}}>Per page</a>
-    <a href="/stats/releases?{{.Filter.Query "path" ""}}"{{if eq .View "releases"}} aria-current="page"{{end}}>Release compare</a>
-    <a href="/stats/agents?{{.Filter.Query "path" ""}}"{{if eq .View "agents"}} aria-current="page"{{end}}>AI &amp; crawlers</a>
+  <nav id="tabs" data-sync aria-label="Stats sections" class="mx-auto flex max-w-[1360px] gap-1 overflow-x-auto px-4 sm:px-8">
+    {{range .Tabs}}<a href="{{.Href}}"{{if .On}} aria-current="page"{{end}} class="flex min-h-11 items-center border-b-2 px-3 text-[14px] whitespace-nowrap no-underline {{if .On}}border-accent font-semibold text-ink{{else}}border-transparent font-medium text-muted hover:text-ink{{end}}">{{.Label}}</a>{{end}}
   </nav>
 </header>
-<main class="wrap">
-<form class="filters" method="get">
+<main id="main" class="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 pt-7 pb-14 sm:px-8">
+{{template "filters" .}}
+{{end}}
+
+{{define "hidden"}}
+  <input type="hidden" name="from" value="{{.Filter.From.Format "2006-01-02"}}">
+  <input type="hidden" name="to" value="{{.Filter.To.Format "2006-01-02"}}">
+  {{template "keep" .}}
+{{end}}
+
+{{define "keep"}}
   {{if .Filter.Path}}<input type="hidden" name="path" value="{{.Filter.Path}}">{{end}}
-  <label>From <input type="date" name="from" value="{{.Filter.From.Format "2006-01-02"}}"></label>
-  <label>To <input type="date" name="to" value="{{.Filter.To.Format "2006-01-02"}}"></label>
-  <label>Locale <select name="locale"><option value="">all</option>{{range .Locales}}<option{{if eq . $.Filter.Locale}} selected{{end}}>{{.}}</option>{{end}}</select></label>
-  <label>Release <select name="release"><option value="">all</option>{{range .Releases}}<option{{if eq .Label $.Filter.Release}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
-  <label class="check"><input type="checkbox" name="internal" value="1"{{if .Filter.IncludeInternal}} checked{{end}}> include internal</label>
-  <button type="submit">Apply</button>
-</form>
-<h1>{{.Title}}</h1>
+  {{if .Filter.Hide}}<input type="hidden" name="hide" value="{{.Filter.ToggleHide ""}}">{{end}}
+  {{if .Filter.Scale}}<input type="hidden" name="scale" value="{{.Filter.Scale}}">{{end}}
+  {{if .Filter.Kind}}<input type="hidden" name="kind" value="{{.Filter.Kind}}">{{end}}
+  {{if .Filter.Arrive}}<input type="hidden" name="arrive" value="{{.Filter.Arrive}}">{{end}}
+{{end}}
+
+{{define "own"}}
+  {{if .Filter.Q}}<input type="hidden" name="q" value="{{.Filter.Q}}">{{end}}
+  {{if .Filter.A}}<input type="hidden" name="a" value="{{.Filter.A}}">{{end}}
+  {{if .Filter.B}}<input type="hidden" name="b" value="{{.Filter.B}}">{{end}}
+{{end}}
+
+{{define "filters"}}
+<section id="filters" data-sync aria-label="Filters" class="flex flex-wrap items-center justify-between gap-4">
+  <div class="flex flex-wrap items-center gap-3">
+    <div role="group" aria-label="Date range" class="seg">
+      {{range .Ranges}}<a href="{{.Href}}" class="seg-btn"{{if .On}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}
+      <details class="relative">
+        <summary class="seg-btn"{{if eq .Filter.Preset "custom"}} aria-current="true"{{end}}>Custom</summary>
+        <form method="get" class="menu left-0 right-auto w-64 gap-3 p-3">
+          {{template "keep" .}}{{template "own" .}}
+          {{if .Filter.Locale}}<input type="hidden" name="locale" value="{{.Filter.Locale}}">{{end}}
+          {{if .Filter.Release}}<input type="hidden" name="release" value="{{.Filter.Release}}">{{end}}
+          {{if .Filter.Version}}<input type="hidden" name="version" value="{{.Filter.Version}}">{{end}}
+          {{if .Filter.Tag}}<input type="hidden" name="tag" value="{{.Filter.Tag}}">{{end}}
+          {{if .Filter.IncludeInternal}}<input type="hidden" name="internal" value="1">{{end}}
+          <label class="flex flex-col gap-1 text-xs text-muted">From <input type="date" name="from" value="{{.Filter.From.Format "2006-01-02"}}" class="field w-full font-mono text-ink"></label>
+          <label class="flex flex-col gap-1 text-xs text-muted">To <input type="date" name="to" value="{{.Filter.To.Format "2006-01-02"}}" class="field w-full font-mono text-ink"></label>
+          <button type="submit" class="btn-light justify-center">Apply range</button>
+        </form>
+      </details>
+    </div>
+    <div role="group" aria-label="Locale" class="seg">
+      {{range .Locales}}<a href="{{.Href}}" class="seg-btn"{{if .On}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}
+    </div>
+    <form method="get" class="contents" data-autosubmit>
+      {{template "hidden" .}}{{template "own" .}}
+      {{if .Filter.Locale}}<input type="hidden" name="locale" value="{{.Filter.Locale}}">{{end}}
+      <label class="field"><span class="text-muted">Release</span>
+        <select name="release">
+          <option value="">All releases</option>
+          {{range .Releases}}<option value="{{.Label}}"{{if eq .Label $.Filter.Release}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      {{if .Versions}}<label class="field"><span class="sr-only">App Version</span>
+        <select name="version">
+          <option value="">All versions</option>
+          {{range .Versions}}<option value="{{.}}"{{if eq . $.Filter.Version}} selected{{end}}>v{{.}}</option>{{end}}
+        </select>
+      </label>{{end}}
+      {{if .Tags}}<label class="field"><span class="sr-only">Release tag</span>
+        <select name="tag">
+          <option value="">All tags</option>
+          {{range .Tags}}<option value="{{.}}"{{if eq . $.Filter.Tag}} selected{{end}}>{{.}}</option>{{end}}
+        </select>
+      </label>{{end}}
+      <label class="flex h-10 items-center gap-2 px-1 text-[13px] text-muted">
+        <input type="checkbox" name="internal" value="1" class="size-4 accent-ink"{{if .Filter.IncludeInternal}} checked{{end}}>
+        Include my own visits
+      </label>
+      <button type="submit" class="btn-sm js-hide">Apply</button>
+    </form>
+  </div>
+  <div class="ml-auto flex items-center gap-2.5">
+    <span class="text-xs text-muted">{{.Filter.RangeText}} · Europe/Amsterdam</span>
+    <details class="relative">
+      <summary class="btn-light">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+        Export
+      </summary>
+      <div class="menu">{{template "export-links" .}}</div>
+    </details>
+  </div>
+</section>
+{{end}}
+
+{{define "export-links"}}
+  <a href="/stats/{{.View}}.csv?{{.Filter.Query}}"><span class="flex flex-col gap-0.5"><span class="font-medium">{{.Title}}</span><span class="text-xs text-muted">This view's figures</span></span><span class="tag">CSV</span></a>
+  {{if ne .View "overview"}}<a href="/stats/overview.csv?{{.Filter.Query "path" ""}}"><span class="flex flex-col gap-0.5"><span class="font-medium">Overview</span><span class="text-xs text-muted">Daily totals by Visitor Kind</span></span><span class="tag">CSV</span></a>{{end}}
+  <a href="/stats/hits.csv?{{.Filter.Query}}"><span class="flex flex-col gap-0.5"><span class="font-medium">Raw Hits</span><span class="text-xs text-muted">One row per Hit, no raw IPs</span></span><span class="tag">CSV</span></a>
+  <a href="/stats/export.sqlite"><span class="flex flex-col gap-0.5"><span class="font-medium">Full database</span><span class="text-xs text-muted">Anonymised Hits, releases, pages, search data</span></span><span class="tag">SQLite</span></a>
 {{end}}
 
 {{define "bottom"}}
-<p class="exports">Exports:
-  <a href="/stats/{{.View}}.csv?{{.Filter.Query}}">{{.View}}.csv</a> ·
-  <a href="/stats/hits.csv?{{.Filter.Query}}">raw hits.csv</a> ·
-  <a href="/stats/export.sqlite">anonymised SQLite database</a>
-</p>
+<footer class="flex flex-wrap justify-between gap-2 pt-1 text-xs text-muted">
+  <span>Student test site for a university digital strategy project, made with Tribelt's permission.</span>
+  <span>No raw IPs stored · first-party only</span>
+</footer>
 </main>
 </body>
 </html>
 {{end}}
 
-{{define "chart"}}<figure class="chart">{{.SVG}}<figcaption><a href="{{.SVGHref}}" download>SVG</a> · <button type="button" class="png" data-name="{{.Name}}">PNG</button></figcaption></figure>{{end}}
+{{define "heading"}}
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div class="flex flex-col gap-1.5">
+    <h1 class="m-0 text-[26px] font-semibold tracking-[-0.01em]">{{.Title}}</h1>
+    {{if .Sub}}<p class="m-0 max-w-[720px] leading-normal text-muted">{{.Sub}}</p>{{end}}
+  </div>
+</div>
+{{end}}
 
-{{define "overview"}}{{template "top" .}}
-{{with .Data}}
-<section class="tiles">
-  <div><span class="n">{{$.Num .Visitors.Visitors}}</span> Visitors</div>
-  <div><span class="n">{{$.Num .Visitors.ReturningVisitors}}</span> Returning Visitors</div>
-  <div><span class="n">{{$.Num .Visitors.DailyVisitors}}</span> Daily Visitors (no cookie)</div>
-  <div><span class="n">{{$.Num ($.SumOutbound .Outbound)}}</span> Outbound Clicks</div>
+{{define "kpi"}}
+<div class="card flex flex-col gap-2.5 px-[18px] pt-[18px] pb-3.5">
+  <div class="flex items-center justify-between gap-2">
+    <span class="text-[13px] font-medium text-muted">{{.Label}}</span>
+    <span class="rounded-full px-[7px] py-0.5 text-xs font-semibold {{if .Up}}bg-up-bg text-up{{else}}bg-down-bg text-down{{end}}" title="Change against the previous period of the same length">{{.Delta}}</span>
+  </div>
+  <div class="text-[32px] font-semibold tracking-[-0.02em] tabular-nums">{{.Value}}</div>
+  <svg viewBox="0 0 200 40" preserveAspectRatio="none" class="block h-9 w-full" aria-hidden="true">
+    <path d="{{.Spark.Area}}" fill="{{.Fill}}"/>
+    <path d="{{.Spark.Line}}" fill="none" stroke="{{.Color}}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+  </svg>
+  {{if .Hint}}<span class="text-xs text-muted">{{.Hint}}</span>{{end}}
+</div>
+{{end}}
+
+{{define "timeline"}}
+<section id="chart-{{.Name}}" aria-labelledby="chart-{{.Name}}-title" class="card flex flex-col gap-4 px-4 pt-[22px] pb-[18px] sm:px-6">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex flex-col gap-1">
+      <h2 id="chart-{{.Name}}-title" class="h2">{{.Title}}</h2>
+      <span class="sub">{{.Sub}}</span>
+    </div>
+    <div class="flex shrink-0 items-center gap-1.5">
+      <a href="{{.SVGHref}}" download class="btn-sm">SVG</a>
+      <button type="button" class="btn-sm" data-png="{{.SVGHref}}" data-name="{{.File}}">PNG</button>
+    </div>
+  </div>
+  <div role="group" aria-label="Visitor Kinds in the chart" class="flex flex-wrap gap-2">
+    {{range .Chips}}<a href="{{.Href}}" data-swap="chart-{{$.Name}}" data-key="{{.Kind}}" class="chip"{{if .Off}} data-off{{end}}><span class="dot {{.Dot}}" aria-hidden="true"></span>{{.Label}}{{if .Off}}<span class="sr-only"> (hidden, show)</span>{{else}}<span class="sr-only"> (shown, hide)</span>{{end}} <span class="font-mono text-muted">{{.Total}}</span></a>{{end}}
+  </div>
+  <div class="grid grid-cols-[44px_minmax(0,1fr)] gap-2">
+    <div class="flex h-[280px] flex-col items-end justify-between pb-0.5 font-mono text-[11px] text-muted" aria-hidden="true">{{range .YTicks}}<span>{{.}}</span>{{end}}</div>
+    <div class="flex min-w-0 flex-col gap-2">
+      <svg viewBox="0 0 1000 280" preserveAspectRatio="none" class="block h-[280px] w-full" role="img" aria-label="{{.Title}}: {{num .Total}} Hits, stacked by Visitor Kind">
+        <line x1="0" y1="0.5" x2="1000" y2="0.5" stroke="#23272B" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="70" x2="1000" y2="70" stroke="#23272B" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="140" x2="1000" y2="140" stroke="#23272B" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="210" x2="1000" y2="210" stroke="#23272B" vector-effect="non-scaling-stroke"/>
+        <line x1="0" y1="279.5" x2="1000" y2="279.5" stroke="#3A4046" vector-effect="non-scaling-stroke"/>
+        {{range .Areas}}<path d="{{.D}}" fill="{{.Color}}" fill-opacity="0.9"><title>{{.Title}}</title></path>{{end}}
+        {{range .Marks}}<line x1="{{printf "%.1f" .X}}" y1="0" x2="{{printf "%.1f" .X}}" y2="280" stroke="#ECEDEE" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>{{end}}
+        {{range .Columns}}<rect x="{{printf "%.2f" .X}}" y="0" width="{{printf "%.2f" .W}}" height="280" fill="transparent"><title>{{.Title}}</title></rect>{{end}}
+      </svg>
+      <div class="flex justify-between font-mono text-[11px] text-muted" aria-hidden="true">{{range .XTicks}}<span>{{.}}</span>{{end}}</div>
+    </div>
+  </div>
+  {{range .Marks}}<div class="flex items-center gap-2 text-xs text-muted">
+    <svg width="22" height="10" viewBox="0 0 22 10" class="shrink-0" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="#ECEDEE" stroke-dasharray="4 3"/></svg>
+    <span><span class="font-mono text-ink">{{.Label}}</span>{{if .Version}} <span class="font-mono">v{{.Version}}</span>{{end}} went live {{.Day}}: {{.Note}}</span>
+  </div>{{end}}
 </section>
-{{template "chart" ($.Chart "timeline")}}
-<div class="cols">
-<section><h2>Hits by Visitor Kind</h2>
-<table><thead><tr><th>Visitor Kind</th><th class="r">Hits</th><th class="r">Visitors</th></tr></thead><tbody>
-{{range .Kinds}}<tr><td>{{.VisitorKind}}</td><td class="r">{{$.Num .Hits}}</td><td class="r">{{$.Num .Visitors}}</td></tr>{{end}}
-</tbody></table></section>
-<section><h2>Outbound Clicks by Visitor Kind</h2>
-<table><thead><tr><th>Visitor Kind</th><th class="r">Clicks</th></tr></thead><tbody>
-{{range .Outbound}}<tr><td>{{.VisitorKind}}</td><td class="r">{{$.Num .Clicks}}</td></tr>{{else}}<tr><td colspan="2">none yet</td></tr>{{end}}
-</tbody></table></section>
-</div>
-{{template "chart" ($.Chart "channels")}}
-<div class="cols">
-<section><h2>Arrival Channel (human page views)</h2>
-<table><thead><tr><th>Channel</th><th class="r">Hits</th><th class="r">Visitors</th><th class="r">Beacon-confirmed</th></tr></thead><tbody>
-{{range .Channels}}<tr><td>{{.Channel}}</td><td class="r">{{$.Num .Hits}}</td><td class="r">{{$.Num .Visitors}}</td><td class="r">{{$.Num .Confirmed}}</td></tr>{{end}}
-</tbody></table></section>
-<section><h2>First-touch Channel (new Visitors)</h2>
-<table><thead><tr><th>Channel</th><th class="r">Visitors</th></tr></thead><tbody>
-{{range .FirstTouch}}<tr><td>{{.Channel}}</td><td class="r">{{$.Num .Visitors}}</td></tr>{{end}}
-</tbody></table></section>
-</div>
-<section><h2>Search Performance</h2>
-{{if .Search}}
-<table><thead><tr><th>Source</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">Avg position</th></tr></thead><tbody>
-{{range .Search}}<tr><td>{{.Source}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{$.Num .Impressions}}</td><td class="r">{{printf "%.1f" .AvgPosition}}</td></tr>{{end}}
-</tbody></table>
-<h3>Top queries</h3>
-<table><thead><tr><th>Query</th><th>Source</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">Position</th></tr></thead><tbody>
-{{range .Queries}}<tr><td>{{.Query}}</td><td>{{.Source}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{$.Num .Impressions}}</td><td class="r">{{printf "%.1f" .AvgPosition}}</td></tr>{{end}}
-</tbody></table>
-{{else}}<p class="muted">No Search Performance data for this range{{if not $.SearchEnabled}} (import disabled: no Search Console or Bing credentials){{end}}.</p>{{end}}
+{{end}}
+
+{{define "bar"}}<svg viewBox="0 0 100 10" preserveAspectRatio="none" class="track" aria-hidden="true"><rect width="100" height="10" fill="#262B30"/><rect width="{{printf "%.2f" .W}}" height="10" fill="{{.Color}}"/></svg>{{end}}
+
+{{define "overview"}}{{template "top" .}}{{with .Data}}
+<section aria-label="Key figures" class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 [&>:last-child:nth-child(odd)]:col-span-2 lg:[&>:last-child:nth-child(odd)]:col-span-1">
+  {{range .KPIs}}{{template "kpi" .}}{{end}}
 </section>
-{{end}}
-{{template "bottom" .}}{{end}}
 
-{{define "pages"}}{{template "top" .}}
-<table class="wide"><thead><tr><th>Page</th><th>Locale</th><th class="r">Human</th><th class="r">Unconf.</th><th class="r">Search crawler</th><th class="r">AI crawler</th><th class="r">AI fetcher</th><th class="r">Other</th><th class="r">.md</th><th class="r">Engaged s</th><th class="r">Outbound</th><th class="r">Out/human</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">Pos.</th></tr></thead><tbody>
-{{range .Data}}<tr><td><a href="/stats/page?{{$.Filter.Query "path" .Path}}">{{.Path}}</a><br><small>{{.Title}}</small></td><td>{{.Locale}}</td><td class="r">{{$.Num .Human}}</td><td class="r">{{$.Num .HumanUnconfirmed}}</td><td class="r">{{$.Num .SearchCrawler}}</td><td class="r">{{$.Num .AiCrawler}}</td><td class="r">{{$.Num .AiFetcher}}</td><td class="r">{{$.Num .Other}}</td><td class="r">{{$.Num .Markdown}}</td><td class="r">{{$.Seconds .AvgEngagedMs}}</td><td class="r">{{$.Num .Outbound}}</td><td class="r">{{printf "%.2f" .OutboundPerHuman}}</td><td class="r">{{$.Num .Impr}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{printf "%.1f" .Position}}</td></tr>
-{{else}}<tr><td colspan="15">No Hits in this range.</td></tr>{{end}}
-</tbody></table>
-{{template "bottom" .}}{{end}}
+{{template "timeline" .Timeline}}
 
-{{define "page"}}{{template "top" .}}
-{{with .Data}}
-<p><a href="{{.Path}}">{{.Path}}</a> · {{.Title}}</p>
-{{template "chart" ($.Chart "page")}}
-<div class="cols">
-<section><h2>How humans arrived</h2>
-<table><thead><tr><th>Channel</th><th>Referrer</th><th class="r">Hits</th></tr></thead><tbody>
-{{range .Referrers}}<tr><td>{{.Channel}}</td><td>{{.ReferrerHost}}</td><td class="r">{{$.Num .Hits}}</td></tr>{{end}}
-</tbody></table></section>
-<section><h2>Crawlers and agents</h2>
-<table><thead><tr><th>Bot</th><th>Kind</th><th>Verified</th><th class="r">Hits</th></tr></thead><tbody>
-{{range .Bots}}<tr><td>{{.BotName}}</td><td>{{.VisitorKind}}</td><td>{{if .Verified}}yes{{else}}no{{end}}</td><td class="r">{{$.Num .Hits}}</td></tr>{{end}}
-</tbody></table></section>
+<section id="fetched" aria-labelledby="fetched-title" class="card overflow-hidden">
+  <div class="flex flex-wrap items-start justify-between gap-4 px-4 pt-[22px] pb-4 sm:px-6">
+    <div class="flex max-w-[760px] flex-col gap-1">
+      <h2 id="fetched-title" class="h2">What was fetched</h2>
+      <span class="sub">Every request grouped by resource, each bar split by Visitor Kind. Shows whether agents read pages, Markdown twins or the agent files.</span>
+    </div>
+    <div role="group" aria-label="Bar scale" class="seg-dark">
+      <a href="?{{$.Filter.Query "scale" ""}}" data-swap="fetched" class="seg-btn"{{if not $.Filter.Scale}} aria-current="true"{{end}}>Requests</a>
+      <a href="?{{$.Filter.Query "scale" "share"}}" data-swap="fetched" class="seg-btn"{{if $.Filter.Scale}} aria-current="true"{{end}}>Share</a>
+    </div>
+  </div>
+  <div role="table" aria-label="Requests by resource">
+    <div role="row" class="thead hidden lg:grid lg:grid-cols-[minmax(0,1.3fr)_84px_minmax(0,2.6fr)_minmax(0,1fr)] lg:gap-4">
+      <span role="columnheader">Resource</span><span role="columnheader" class="text-right">Requests</span><span role="columnheader">Who fetched it</span><span role="columnheader">Top client</span>
+    </div>
+    {{range .Fetched}}
+    <div role="row" class="trow grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)_84px_minmax(0,2.6fr)_minmax(0,1fr)] lg:gap-4">
+      <div role="cell" class="flex min-w-0 flex-col gap-0.5">
+        <span class="font-medium">{{.Label}}</span>
+        <span class="truncate font-mono text-xs text-muted">{{.Example}}</span>
+      </div>
+      <span role="cell" class="text-right font-mono text-[13px]">{{.Total}}</span>
+      <div role="cell" class="col-span-2 lg:col-span-1">
+        {{if .Segs}}<svg viewBox="0 0 1000 14" preserveAspectRatio="none" class="block h-3.5 w-full rounded" role="img" aria-label="{{.Label}} by Visitor Kind">{{range .Segs}}<rect x="{{printf "%.1f" .X}}" width="{{printf "%.1f" .W}}" height="14" fill="{{.Color}}"><title>{{.Title}}</title></rect>{{end}}</svg>{{else}}<span class="text-xs text-muted">No requests</span>{{end}}
+      </div>
+      <div role="cell" class="col-span-2 flex min-w-0 flex-row items-baseline gap-2 lg:col-span-1 lg:flex-col lg:items-start lg:gap-0.5">
+        <span class="text-[13px] font-medium">{{.Top}}</span>
+        <span class="text-xs text-muted">{{.TopShare}}</span>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  <div class="flex flex-wrap items-center gap-4 px-4 py-3.5 text-xs text-muted sm:px-6" aria-label="Visitor Kind colours">
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-human"></span>Human</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-unconfirmed"></span>Human (unconfirmed)</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-search"></span>Search crawler</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-aicrawler"></span>AI crawler</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-aifetcher"></span>AI fetcher</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-seo"></span>SEO tool</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-other"></span>Other bot</span>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <div id="arrive" class="card flex flex-col gap-[18px] px-4 py-[22px] sm:px-6">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="flex flex-col gap-1">
+        <h2 class="h2">How people arrive</h2>
+        <span class="sub">{{if $.Filter.Arrive}}First-touch Channel of Visitors first seen in this range{{else}}Human page views by Arrival Channel{{end}}</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <div role="group" aria-label="Count" class="seg-dark">
+          <a href="?{{$.Filter.Query "arrive" ""}}" data-swap="arrive" class="seg-btn"{{if not $.Filter.Arrive}} aria-current="true"{{end}}>Page views</a>
+          <a href="?{{$.Filter.Query "arrive" "first"}}" data-swap="arrive" class="seg-btn"{{if $.Filter.Arrive}} aria-current="true"{{end}}>First touch</a>
+        </div>
+        <a href="/stats/chart/channels.svg?{{$.Filter.Query}}" download class="btn-sm" aria-label="Download as SVG">SVG</a>
+      </div>
+    </div>
+    <div class="flex flex-col gap-3">
+      {{range .Arrive}}
+      <div class="grid grid-cols-[80px_minmax(0,1fr)_48px_40px] items-center gap-3 sm:grid-cols-[96px_minmax(0,1fr)_56px_48px]">
+        <span class="text-[13px] font-medium">{{.Label}}</span>
+        {{template "bar" .}}
+        <span class="text-right font-mono text-xs">{{.Value}}</span>
+        <span class="text-right font-mono text-xs text-muted">{{.Share}}</span>
+      </div>
+      {{end}}
+    </div>
+    <div class="flex gap-2.5 rounded-[10px] bg-note px-3.5 py-3 text-[13px] leading-[1.45]">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59A68" stroke-width="2" stroke-linecap="round" class="mt-px shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+      <span>AI-chat referrals: chatgpt.com, perplexity.ai, claude.ai, gemini and copilot. These are people who clicked through from an AI answer.</span>
+    </div>
+  </div>
+
+  <div class="card flex flex-col gap-[18px] px-4 py-[22px] sm:px-6">
+    <div class="flex flex-col gap-1">
+      <h2 class="h2">Bots and agents</h2>
+      <span class="sub">Automated hits by Visitor Kind, verified against published IP ranges</span>
+    </div>
+    <div role="table" aria-label="Automated Hits by Visitor Kind" class="flex flex-col">
+      <div role="row" class="grid grid-cols-[minmax(0,1fr)_56px_96px_48px] gap-3 border-b border-hair pb-2 text-xs font-medium text-muted sm:grid-cols-[minmax(0,1fr)_72px_120px_64px]">
+        <span role="columnheader">Visitor Kind</span><span role="columnheader" class="text-right">Hits</span><span role="columnheader">Verified</span><span role="columnheader" class="text-right">Pages</span>
+      </div>
+      {{range .Bots}}
+      <div role="row" class="grid grid-cols-[minmax(0,1fr)_56px_96px_48px] items-center gap-3 border-b border-rule py-[11px] sm:grid-cols-[minmax(0,1fr)_72px_120px_64px]">
+        <span role="cell" class="flex items-center gap-2.5 font-medium"><span class="dot {{.Dot}}" aria-hidden="true"></span>{{.Label}}</span>
+        <span role="cell" class="text-right font-mono text-[13px]">{{.Hits}}</span>
+        <span role="cell" class="flex items-center gap-2">
+          <svg viewBox="0 0 100 6" preserveAspectRatio="none" class="block h-1.5 min-w-0 grow overflow-hidden rounded-full" aria-hidden="true"><rect width="100" height="6" fill="#262B30"/><rect width="{{.VerifiedW}}" height="6" fill="#ECEDEE"/></svg>
+          <span class="font-mono text-xs text-muted">{{.Verified}}</span>
+        </span>
+        <span role="cell" class="text-right font-mono text-[13px]">{{.Pages}}</span>
+      </div>
+      {{end}}
+    </div>
+    <a href="/stats/agents?{{$.Filter.Query}}" class="flex min-h-8 items-center gap-1.5 text-[13px] font-medium no-underline">See every crawler and agent
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+    </a>
+  </div>
+</section>
+
+<section aria-labelledby="pages-title" class="card overflow-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-4 px-4 pt-5 pb-3.5 sm:px-6">
+    <div class="flex flex-col gap-1">
+      <h2 id="pages-title" class="h2">Top Mirror Pages</h2>
+      <span class="sub">Sorted by human page views. Outbound Clicks lead to the Official Page on tribelt.nl.</span>
+    </div>
+    <form method="get" action="/stats/pages" role="search" class="field w-full sm:w-auto sm:min-w-[240px]">
+      {{template "hidden" $}}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9BA1A6" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Filter by path or title" aria-label="Filter pages" class="w-full outline-none placeholder:text-muted">
+    </form>
+  </div>
+  {{template "page-table" (pageTable $ .Pages false)}}
+  <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5 text-[13px] text-muted sm:px-6">
+    <span>Showing {{len .Pages}} of {{.PageTotal}} Mirror Pages with Hits</span>
+    <a href="/stats/pages?{{$.Filter.Query}}" class="font-medium no-underline">Open the per-page view</a>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+  {{template "search-panel" (searchPanel $ .Search)}}
+  <div class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
+    <h2 class="h2">Exports</h2>
+    <a href="/stats/overview.csv?{{$.Filter.Query}}" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Overview</span><span class="text-xs text-muted">Daily totals by Visitor Kind</span></span><span class="tag">CSV</span></a>
+    <a href="/stats/hits.csv?{{$.Filter.Query}}" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Raw Hits</span><span class="text-xs text-muted">One row per Hit, no raw IPs</span></span><span class="tag">CSV</span></a>
+    <a href="/stats/export.sqlite" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Full database</span><span class="text-xs text-muted">Anonymised Hits, releases, pages, search data</span></span><span class="tag">SQLite</span></a>
+  </div>
+</section>
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "page-table"}}
+{{$cols := "md:grid-cols-[minmax(0,2.4fr)_56px_repeat(5,84px)_120px]"}}{{if .Full}}{{$cols = "md:grid-cols-[minmax(0,2.4fr)_48px_repeat(8,72px)_120px]"}}{{end}}
+<div role="table" aria-label="Mirror Pages">
+  <div role="row" class="thead grid grid-cols-[minmax(0,1fr)_64px_64px] {{$cols}}">
+    <span role="columnheader">Page</span><span role="columnheader" class="max-md:hidden">Locale</span><span role="columnheader" class="text-right">Humans</span><span role="columnheader" class="text-right">AI fetches</span><span role="columnheader" class="text-right max-md:hidden">Crawlers</span>{{if .Full}}<span role="columnheader" class="text-right max-md:hidden">.md</span>{{end}}<span role="columnheader" class="text-right max-md:hidden">Outbound</span><span role="columnheader" class="text-right max-md:hidden">Engaged</span>{{if .Full}}<span role="columnheader" class="text-right max-md:hidden">Impr.</span><span role="columnheader" class="text-right max-md:hidden">Pos.</span>{{end}}<span role="columnheader" class="max-md:hidden">Last {{.Days}} days</span>
+  </div>
+  {{range .Rows}}
+  <div role="row" data-row class="trow grid grid-cols-[minmax(0,1fr)_64px_64px] {{$cols}}">
+    <a role="cell" href="/stats/page?{{$.Filter.Query "path" .Path "q" ""}}" class="flex min-w-0 flex-col gap-0.5 text-ink no-underline hover:text-link">
+      <span class="truncate font-medium">{{if .Title}}{{.Title}}{{else}}{{.Path}}{{end}}</span>
+      <span class="truncate font-mono text-xs text-muted"><span class="md:hidden">{{.Locale}} · </span>{{.Path}}</span>
+    </a>
+    <span role="cell" class="max-md:hidden"><span class="tag uppercase">{{.Locale}}</span></span>
+    <span role="cell" class="text-right font-mono text-[13px]">{{num .Humans}}</span>
+    <span role="cell" class="text-right font-mono text-[13px]">{{num .AI}}</span>
+    <span role="cell" class="text-right font-mono text-[13px] max-md:hidden">{{num .Crawlers}}</span>
+    {{if $.Full}}<span role="cell" class="text-right font-mono text-[13px] max-md:hidden">{{num .Markdown}}</span>{{end}}
+    <span role="cell" class="text-right font-mono text-[13px] max-md:hidden">{{num .Outbound}}</span>
+    <span role="cell" class="text-right font-mono text-[13px] text-muted max-md:hidden">{{.Engaged}}</span>
+    {{if $.Full}}<span role="cell" class="text-right font-mono text-[13px] max-md:hidden">{{num .Impr}}</span><span role="cell" class="text-right font-mono text-[13px] text-muted max-md:hidden">{{if .Impr}}{{one .Position}}{{else}}—{{end}}</span>{{end}}
+    <span role="cell" class="max-md:hidden"><svg viewBox="0 0 120 28" preserveAspectRatio="none" class="block h-7 w-[120px]" aria-hidden="true"><path d="{{.Spark.Line}}" fill="none" stroke="#4CC39B" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg></span>
+  </div>
+  {{else}}
+  <div role="row" class="trow"><span role="cell" class="text-muted">No Hits on Mirror Pages in this range.</span></div>
+  {{end}}
 </div>
-<section><h2>Search Performance</h2>
-<table><thead><tr><th>Query</th><th>Source</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">Position</th></tr></thead><tbody>
-{{range .Queries}}<tr><td>{{.Query}}</td><td>{{.Source}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{$.Num .Impressions}}</td><td class="r">{{printf "%.1f" .AvgPosition}}</td></tr>{{else}}<tr><td colspan="5">No queries recorded.</td></tr>{{end}}
-</tbody></table></section>
-<section><h2>Page per Content Release</h2>
-<table><thead><tr><th>Release</th><th>Title</th><th>Description</th><th class="r">Words</th></tr></thead><tbody>
-{{range .History}}<tr><td>{{.ReleaseLabel}}</td><td>{{.Title}}</td><td>{{.Description}}</td><td class="r">{{.WordCount}}</td></tr>{{end}}
-</tbody></table></section>
 {{end}}
-{{template "bottom" .}}{{end}}
 
-{{define "releases"}}{{template "top" .}}
-<p class="muted">Per-day rates normalise for how long each Content Release was live. Search figures use each release's calendar window.</p>
-<table class="wide"><thead><tr><th>Release</th><th>Started</th><th class="r">Days</th><th class="r">Humans/day</th><th class="r">Search crawler/day</th><th class="r">AI/day</th><th class="r">From search</th><th class="r">From AI chat</th><th class="r">Visitors</th><th class="r">Outbound (human)</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">Pos.</th></tr></thead><tbody>
-{{range .Data}}<tr><td><strong>{{.ReleaseLabel}}</strong><br><small>{{.Note}}</small></td><td>{{.FirstSeen.Format "2006-01-02"}}</td><td class="r">{{.Days}}</td><td class="r">{{printf "%.1f" .HumansPerDay}}</td><td class="r">{{printf "%.1f" .CrawlersPerDay}}</td><td class="r">{{printf "%.1f" .AIPerDay}}</td><td class="r">{{$.Num .FromSearch}}</td><td class="r">{{$.Num .FromAiChat}}</td><td class="r">{{$.Num .Visitors}}</td><td class="r">{{$.Num .HumanOut}}</td><td class="r">{{$.Num .Impr}}</td><td class="r">{{$.Num .Clicks}}</td><td class="r">{{printf "%.1f" .Position}}</td></tr>{{end}}
-</tbody></table>
-{{template "chart" ($.Chart "timeline")}}
-{{template "bottom" .}}{{end}}
-
-{{define "agents"}}{{template "top" .}}
-{{with .Data}}
-{{template "chart" ($.Chart "agents")}}
-<section><h2>Bots</h2>
-<table class="wide"><thead><tr><th>Bot</th><th>Visitor Kind</th><th>Verified</th><th class="r">Hits</th><th class="r">Paths</th><th class="r">.md</th><th class="r">txt</th><th class="r">xml</th><th>Last seen</th></tr></thead><tbody>
-{{range .Bots}}<tr><td>{{.BotName}}</td><td>{{.VisitorKind}}</td><td>{{if .Verified}}yes{{else}}no{{end}}</td><td class="r">{{$.Num .Hits}}</td><td class="r">{{$.Num .Paths}}</td><td class="r">{{$.Num .Markdown}}</td><td class="r">{{$.Num .Txt}}</td><td class="r">{{$.Num .Xml}}</td><td>{{.LastSeen.Format "2006-01-02 15:04"}}</td></tr>{{else}}<tr><td colspan="9">No crawler Hits in this range.</td></tr>{{end}}
-</tbody></table></section>
-<section><h2>Most-fetched paths</h2>
-<table><thead><tr><th>Path</th><th class="r">Search crawler</th><th class="r">AI crawler</th><th class="r">AI fetcher</th></tr></thead><tbody>
-{{range .Paths}}<tr><td><a href="/stats/page?{{$.Filter.Query "path" .Path}}">{{.Path}}</a></td><td class="r">{{$.Num .SearchCrawler}}</td><td class="r">{{$.Num .AiCrawler}}</td><td class="r">{{$.Num .AiFetcher}}</td></tr>{{end}}
-</tbody></table></section>
+{{define "search-panel"}}
+{{with .Search}}
+{{if .Totals}}
+<div class="card flex flex-col gap-4 px-4 py-[22px] sm:px-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex flex-col gap-1">
+      <h2 class="h2">Search Performance</h2>
+      <span class="sub">Queries, impressions and position reported by the search engines, not derived from Hits</span>
+    </div>
+    <a href="/stats/search?{{$.Filter.Query}}" class="flex min-h-8 items-center text-[13px] font-medium no-underline">Open Search</a>
+  </div>
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    {{range .Totals}}<div class="flex flex-col gap-1 rounded-[10px] border border-hair px-3.5 py-3">
+      <span class="text-xs text-muted">{{source .Source}}</span>
+      <span class="flex flex-wrap items-baseline gap-x-3 font-mono text-xs text-muted"><span><span class="font-sans text-[20px] font-semibold text-ink">{{num .Clicks}}</span> clicks</span><span>{{num .Impressions}} impressions</span><span>pos. {{one .AvgPosition}}</span></span>
+    </div>{{end}}
+  </div>
+  {{if .Queries}}<div class="flex flex-col">
+    <div class="grid grid-cols-[minmax(0,1fr)_64px_80px] gap-3 border-b border-hair pb-2 text-xs font-medium text-muted"><span>Top queries</span><span class="text-right">Clicks</span><span class="text-right">Impressions</span></div>
+    {{range .Queries}}<div class="grid grid-cols-[minmax(0,1fr)_64px_80px] gap-3 border-b border-rule py-2 text-[13px]"><span class="truncate">{{.Query}}</span><span class="text-right font-mono text-muted">{{num .Clicks}}</span><span class="text-right font-mono text-muted">{{num .Impressions}}</span></div>{{end}}
+  </div>{{end}}
+</div>
+{{else}}
+<div class="card flex items-start gap-5 px-4 py-[22px] sm:px-6">
+  <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-track" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ECEDEE" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M8 11h6"/></svg>
+  </div>
+  <div class="flex grow flex-col gap-2">
+    <h2 class="h2">{{if .Sources.Any}}No Search Performance data for this range yet{{else}}Search Performance is not connected yet{{end}}</h2>
+    <p class="m-0 max-w-[640px] leading-normal text-muted">{{if .Sources.Any}}The daily import runs, but the search engines have reported nothing for these days. Their figures lag by two to three days.{{else}}Server logs cannot see search keywords. Connect Google Search Console and Bing Webmaster Tools to see queries, impressions and average position per page and per Content Release.{{end}}</p>
+    <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
+      {{if not .Sources.Any}}<a href="/stats/search?{{$.Filter.Query}}#connect" class="btn-light">How to connect</a>{{end}}
+      <span class="flex items-center gap-2 text-xs text-muted">
+        <span class="size-2 rounded-full {{if .Sources.Google}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span> Google: {{if .Sources.Google}}connected{{else}}no credentials{{end}}
+        <span class="ml-2 size-2 rounded-full {{if .Sources.Bing}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span> Bing: {{if .Sources.Bing}}connected{{else}}no credentials{{end}}
+      </span>
+    </div>
+  </div>
+</div>
 {{end}}
-{{template "bottom" .}}{{end}}
+{{end}}
+{{end}}
+
+{{define "pages"}}{{template "top" .}}{{with .Data}}
+{{template "heading" (heading "Pages" "Every Mirror Page with Hits in this range, busiest with humans first. Open a page for its timeline, referrers, agents and history per Content Release.")}}
+<section aria-label="Mirror Pages" class="card overflow-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-4 px-4 pt-5 pb-3.5 sm:px-6">
+    <span class="sub">{{len .Rows}} Mirror Pages{{if $.Filter.Q}} matching “{{$.Filter.Q}}”{{end}}</span>
+    <form method="get" role="search" class="field w-full sm:w-auto sm:min-w-[280px]">
+      {{template "hidden" $}}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9BA1A6" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" name="q" value="{{$.Filter.Q}}" placeholder="Filter by path or title" aria-label="Filter pages" data-filter="#page-rows" class="w-full outline-none placeholder:text-muted">
+    </form>
+  </div>
+  <div id="page-rows">{{template "page-table" (pageTable $ .Rows true)}}</div>
+</section>
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "page"}}{{template "top" .}}{{with .Data}}
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div class="flex min-w-0 flex-col gap-1.5">
+    <a href="/stats/pages?{{$.Filter.Query "path" ""}}" class="text-[13px] no-underline">← Pages</a>
+    <h1 class="m-0 text-[26px] font-semibold tracking-[-0.01em]">{{if .Title}}{{.Title}}{{else}}{{.Path}}{{end}}</h1>
+    <span class="truncate font-mono text-[13px] text-muted">{{.Path}}</span>
+  </div>
+  <a href="{{.Path}}" class="flex items-center gap-1.5 text-[13px] no-underline">Open the Mirror Page
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+  </a>
+</div>
+<section aria-label="Key figures" class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+  {{range .KPIs}}{{template "kpi" .}}{{end}}
+</section>
+{{template "timeline" .Timeline}}
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <div class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
+    <h2 class="h2">How people arrived</h2>
+    <div role="table" aria-label="Referrers" class="flex flex-col">
+      <div role="row" class="grid grid-cols-[96px_minmax(0,1fr)_64px] gap-3 border-b border-hair pb-2 text-xs font-medium text-muted"><span role="columnheader">Channel</span><span role="columnheader">Referrer</span><span role="columnheader" class="text-right">Hits</span></div>
+      {{range .Referrers}}<div role="row" class="grid grid-cols-[96px_minmax(0,1fr)_64px] gap-3 border-b border-rule py-2.5 text-[13px]"><span role="cell" class="font-medium">{{channel .Channel}}</span><span role="cell" class="truncate font-mono text-xs text-muted">{{if .ReferrerHost}}{{.ReferrerHost}}{{else}}—{{end}}</span><span role="cell" class="text-right font-mono">{{num .Hits}}</span></div>
+      {{else}}<div role="row" class="py-2.5 text-[13px] text-muted"><span role="cell">No human Hits in this range.</span></div>{{end}}
+    </div>
+  </div>
+  <div class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
+    <h2 class="h2">Bots and agents</h2>
+    <div role="table" aria-label="Crawlers and agents on this page" class="flex flex-col">
+      <div role="row" class="grid grid-cols-[minmax(0,1fr)_120px_72px_56px] gap-3 border-b border-hair pb-2 text-xs font-medium text-muted"><span role="columnheader">Agent</span><span role="columnheader">Visitor Kind</span><span role="columnheader">Verified</span><span role="columnheader" class="text-right">Hits</span></div>
+      {{range .Bots}}<div role="row" class="grid grid-cols-[minmax(0,1fr)_120px_72px_56px] items-center gap-3 border-b border-rule py-2.5 text-[13px]"><span role="cell" class="truncate font-medium">{{.Name}}</span><span role="cell" class="flex items-center gap-2"><span class="dot {{.Dot}}" aria-hidden="true"></span>{{.Label}}</span><span role="cell"><span class="pill-{{.VerifiedTone}}">{{.VerifiedText}}</span></span><span role="cell" class="text-right font-mono">{{num .Hits}}</span></div>
+      {{else}}<div role="row" class="py-2.5 text-[13px] text-muted"><span role="cell">No crawler or agent Hits in this range.</span></div>{{end}}
+    </div>
+  </div>
+</section>
+<section class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
+  <h2 class="h2">Search Performance</h2>
+  {{if .Queries}}<div role="table" aria-label="Search queries for this page" class="flex flex-col">
+    <div role="row" class="grid grid-cols-[minmax(0,1fr)_72px_64px_88px_56px] gap-3 border-b border-hair pb-2 text-xs font-medium text-muted"><span role="columnheader">Query</span><span role="columnheader">Source</span><span role="columnheader" class="text-right">Clicks</span><span role="columnheader" class="text-right">Impressions</span><span role="columnheader" class="text-right">Pos.</span></div>
+    {{range .Queries}}<div role="row" class="grid grid-cols-[minmax(0,1fr)_72px_64px_88px_56px] gap-3 border-b border-rule py-2.5 text-[13px]"><span role="cell" class="truncate">{{.Query}}</span><span role="cell" class="text-muted">{{source .Source}}</span><span role="cell" class="text-right font-mono">{{num .Clicks}}</span><span role="cell" class="text-right font-mono">{{num .Impressions}}</span><span role="cell" class="text-right font-mono text-muted">{{one .AvgPosition}}</span></div>{{end}}
+  </div>{{else}}<p class="m-0 text-[13px] text-muted">No search queries recorded for this page in this range.</p>{{end}}
+</section>
+<section class="card overflow-hidden">
+  <div class="flex flex-col gap-1 px-4 pt-5 pb-3.5 sm:px-6">
+    <h2 class="h2">This page per Content Release</h2>
+    <span class="sub">What search engines and assistants read: title, description and length as each release published them.</span>
+  </div>
+  <div role="table" aria-label="Page per Content Release" class="overflow-x-auto" tabindex="0">
+    <div role="row" class="thead grid min-w-[720px] grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,2fr)_64px]"><span role="columnheader">Content Release</span><span role="columnheader">Title</span><span role="columnheader">Description</span><span role="columnheader" class="text-right">Words</span></div>
+    {{range .History}}<div role="row" class="trow grid min-w-[720px] grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,2fr)_64px] text-[13px]">
+      <span role="cell" class="flex flex-col gap-0.5"><span class="font-mono font-medium">{{.Release.Label}}</span><span class="font-mono text-xs text-muted">{{versions .Release.AppVersions}}{{if .Changed}} · text changed{{end}}</span></span>
+      <span role="cell">{{.Title}}</span><span role="cell" class="text-muted">{{.Description}}</span><span role="cell" class="text-right font-mono">{{.WordCount}}</span>
+    </div>{{end}}
+  </div>
+</section>
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "release-card"}}
+<div class="card flex flex-col gap-2 px-4 py-[18px] sm:px-6">
+  <span class="text-xs font-medium text-muted">{{.Side}}</span>
+  {{with .Row}}
+  <span class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><span class="font-mono text-[17px] font-semibold">{{.ReleaseLabel}}</span><span class="font-mono text-xs text-muted">{{.Versions}}</span></span>
+  <span class="text-[13px] leading-normal">{{.Release.Note}}</span>
+  <span class="text-xs text-muted">Live since {{date .Release.FirstSeenAt}} · {{.Days}} days with Hits in this range</span>
+  {{if .Release.Tags}}<span class="flex flex-wrap gap-1.5">{{range .Release.Tags}}<span class="tag">{{.}}</span>{{end}}</span>{{end}}
+  {{end}}
+</div>
+{{end}}
+
+{{define "releases"}}{{template "top" .}}{{with .Data}}
+{{template "heading" (heading "Releases" "Every Content Release with the App Versions that served it and its experiment tags. Rates are per day with Hits, so releases that ran for different lengths compare fairly; search figures use each release's calendar window.")}}
+{{with .Compare}}{{if and .A .B}}
+<section aria-labelledby="compare-title" class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <h2 id="compare-title" class="h2">Compare two Content Releases</h2>
+    <form method="get" class="flex flex-wrap items-center gap-2" data-autosubmit>
+      {{template "hidden" $}}
+      {{if $.Filter.Locale}}<input type="hidden" name="locale" value="{{$.Filter.Locale}}">{{end}}
+      {{if $.Filter.Release}}<input type="hidden" name="release" value="{{$.Filter.Release}}">{{end}}
+      {{if $.Filter.Version}}<input type="hidden" name="version" value="{{$.Filter.Version}}">{{end}}
+      {{if $.Filter.Tag}}<input type="hidden" name="tag" value="{{$.Filter.Tag}}">{{end}}
+      {{if $.Filter.IncludeInternal}}<input type="hidden" name="internal" value="1">{{end}}
+      <label class="field"><span class="text-muted">A</span><select name="a">{{range $.Releases}}<option value="{{.Label}}"{{if eq .Label $.Data.Compare.A.ReleaseLabel}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+      <label class="field"><span class="text-muted">B</span><select name="b">{{range $.Releases}}<option value="{{.Label}}"{{if eq .Label $.Data.Compare.B.ReleaseLabel}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+      <button type="submit" class="btn-sm js-hide">Compare</button>
+    </form>
+  </div>
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    {{template "release-card" (side "A · before" .A)}}
+    {{template "release-card" (side "B · after" .B)}}
+  </div>
+  <div role="table" aria-label="Release comparison" class="card overflow-hidden">
+    <div role="row" class="thead grid grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] sm:grid-cols-[minmax(0,2fr)_120px_120px_96px]"><span role="columnheader">Per day with Hits</span><span role="columnheader" class="text-right">A</span><span role="columnheader" class="text-right">B</span><span role="columnheader" class="text-right">Change</span></div>
+    {{range .Metrics}}<div role="row" class="trow grid grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] sm:grid-cols-[minmax(0,2fr)_120px_120px_96px]">
+      <span role="cell" class="text-[13px] font-medium">{{.Label}}</span><span role="cell" class="text-right font-mono text-[13px] text-muted">{{.A}}</span><span role="cell" class="text-right font-mono text-[13px]">{{.B}}</span>
+      <span role="cell" class="text-right"><span class="rounded-full px-[7px] py-0.5 text-xs font-semibold {{if .Good}}bg-up-bg text-up{{else}}bg-down-bg text-down{{end}}">{{.Delta}}</span></span>
+    </div>{{end}}
+  </div>
+  <div class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
+    <div class="flex flex-col gap-1">
+      <h3 class="m-0 text-[15px] font-semibold">What changed between A and B</h3>
+      <span class="sub">{{len .Changes}} Mirror Pages changed, {{.Unchanged}} unchanged</span>
+    </div>
+    {{range .Changes}}<div class="grid grid-cols-1 gap-1 border-b border-rule py-2.5 text-[13px] sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_120px] sm:gap-3">
+      <span class="truncate font-mono text-xs">{{.Path}}</span>
+      <span>{{if .Added}}<span class="tag">new</span> {{.TitleB}}{{else if .Removed}}<span class="tag">removed</span> {{.TitleA}}{{else if ne .TitleA .TitleB}}<span class="text-muted line-through">{{.TitleA}}</span> → {{.TitleB}}{{else}}{{.TitleB}} <span class="text-muted">(text changed)</span>{{end}}</span>
+      <span class="font-mono text-xs text-muted sm:text-right">{{.WordsA}} → {{.WordsB}} words</span>
+    </div>{{else}}<p class="m-0 text-[13px] text-muted">No page text differs between these releases.</p>{{end}}
+  </div>
+</section>
+{{else}}
+<section class="card px-4 py-[22px] text-muted sm:px-6">Only one Content Release so far. Change <code class="font-mono text-ink">release</code> in content/site.yml to start the next one; it will be compared here.</section>
+{{end}}{{end}}
+
+<section aria-labelledby="all-releases" class="card overflow-hidden">
+  <div class="flex flex-col gap-1 px-4 pt-5 pb-3.5 sm:px-6">
+    <h2 id="all-releases" class="h2">Every Content Release</h2>
+    <span class="sub">Label, note and tags come from content/site.yml; the App Version is the release-please build that served it.</span>
+  </div>
+  <div role="table" aria-label="Content Releases" class="overflow-x-auto" tabindex="0">
+    <div role="row" class="thead grid min-w-[980px] grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_96px_repeat(6,80px)]">
+      <span role="columnheader">Content Release</span><span role="columnheader">App Version</span><span role="columnheader">Started</span><span role="columnheader" class="text-right">Days</span><span role="columnheader" class="text-right">Humans/day</span><span role="columnheader" class="text-right">Search/day</span><span role="columnheader" class="text-right">AI/day</span><span role="columnheader" class="text-right">Outbound</span><span role="columnheader" class="text-right">Impr.</span>
+    </div>
+    {{range .Rows}}<div role="row" class="trow grid min-w-[980px] grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_96px_repeat(6,80px)]">
+      <div role="cell" class="flex min-w-0 flex-col gap-1">
+        <a href="?{{$.Filter.Query "release" .ReleaseLabel}}" class="font-mono font-medium no-underline" title="Filter every view to this Content Release">{{.ReleaseLabel}}</a>
+        <span class="text-xs text-muted">{{.Release.Note}}</span>
+        {{if .Release.Tags}}<span class="flex flex-wrap gap-1.5">{{range .Release.Tags}}<a href="?{{$.Filter.Query "tag" .}}" class="tag no-underline">{{.}}</a>{{end}}</span>{{end}}
+      </div>
+      <span role="cell" class="flex flex-wrap gap-1.5">{{range .Release.AppVersions}}<a href="?{{$.Filter.Query "version" .}}" class="tag no-underline">v{{.}}</a>{{else}}<span class="text-muted">unknown</span>{{end}}</span>
+      <span role="cell" class="font-mono text-xs text-muted">{{.FirstSeen}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{.Days}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{f1 .HumansPerDay}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{f1 .CrawlersPerDay}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{f1 .AIPerDay}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{num .HumanOut}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{num .Impr}}</span>
+    </div>{{end}}
+  </div>
+</section>
+{{template "timeline" .Timeline}}
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "agents"}}{{template "top" .}}{{with .Data}}
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div class="flex flex-col gap-1.5">
+    <h1 class="m-0 text-[26px] font-semibold tracking-[-0.01em]">AI &amp; crawlers</h1>
+    <p class="m-0 max-w-[720px] leading-normal text-muted">Which machines read the mirror, what they fetched, and whether they are who they claim to be. A claimed crawler outside its operator's published IP ranges counts as Other bot.</p>
+  </div>
+  <span class="text-xs text-muted">{{$.Filter.RangeText}}</span>
+</div>
+
+<section aria-label="Agent-facing files" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {{range .Files}}<div class="card flex flex-col gap-2.5 p-[18px]">
+    <span class="font-mono text-[13px] font-medium">{{.Name}}</span>
+    <span class="text-[28px] font-semibold tabular-nums">{{.Hits}}</span>
+    <span class="text-xs text-muted">{{.Hint}}</span>
+    <div class="flex flex-wrap gap-1.5">{{range .Top}}<span class="rounded-full bg-track px-2 py-[3px] text-[11px] font-medium">{{.}}</span>{{end}}</div>
+  </div>{{end}}
+</section>
+
+<section id="bots" aria-labelledby="bots-title" class="card overflow-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-4 px-4 pt-5 pb-3.5 sm:px-6">
+    <h2 id="bots-title" class="h2">Every crawler and agent</h2>
+    <div role="group" aria-label="Filter by kind" class="seg-dark max-w-full overflow-x-auto">
+      {{range .Kinds}}<a href="{{.Href}}" data-swap="bots" class="seg-btn"{{if .On}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}
+    </div>
+  </div>
+  <div role="table" aria-label="Crawlers and agents" class="overflow-x-auto" tabindex="0">
+    <div role="row" class="thead grid min-w-[980px] grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_130px_72px_100px_minmax(0,1.6fr)_100px]">
+      <span role="columnheader">Agent</span><span role="columnheader">Operator</span><span role="columnheader">Visitor Kind</span><span role="columnheader" class="text-right">Hits</span><span role="columnheader">Verified</span><span role="columnheader">What it fetched</span><span role="columnheader" class="text-right">Last seen</span>
+    </div>
+    {{range .Bots}}<div role="row" class="trow grid min-w-[980px] grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_130px_72px_100px_minmax(0,1.6fr)_100px]">
+      <span role="cell" class="flex min-w-0 flex-wrap items-center gap-2 font-medium">{{.Name}}{{if .ReadLLMs}}<span class="rounded-md bg-down-bg px-1.5 py-0.5 font-mono text-[10px] font-medium text-link">read llms.txt</span>{{end}}</span>
+      <span role="cell" class="text-muted">{{.Operator}}</span>
+      <span role="cell" class="flex items-center gap-2 text-[13px]"><span class="dot {{.Dot}}" aria-hidden="true"></span>{{.Label}}</span>
+      <span role="cell" class="text-right font-mono text-[13px]">{{num .Hits}}</span>
+      <span role="cell"><span class="pill-{{.VerifiedTone}}">{{.VerifiedText}}</span></span>
+      <div role="cell" class="flex min-w-0 flex-col gap-[5px]">
+        <svg viewBox="0 0 1000 8" preserveAspectRatio="none" class="block h-2 w-full rounded-[3px]" role="img" aria-label="What {{.Name}} fetched: {{.MixText}}">{{range .Mix}}<rect x="{{printf "%.1f" .X}}" width="{{printf "%.1f" .W}}" height="8" fill="{{.Color}}"><title>{{.Title}}</title></rect>{{end}}</svg>
+        <span class="truncate text-xs text-muted">{{.MixText}}</span>
+      </div>
+      <span role="cell" class="text-right text-[13px] text-muted">{{.Last}}</span>
+    </div>{{else}}<div role="row" class="trow"><span role="cell" class="text-muted">No crawler or agent Hits in this range.</span></div>{{end}}
+  </div>
+  <div class="flex flex-wrap items-center gap-4 px-4 py-3.5 text-xs text-muted sm:px-6" aria-label="Fetch colours">
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-search"></span>HTML</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-aicrawler"></span>.md</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-seo"></span>robots</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-aifetcher"></span>llms</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-human"></span>sitemap</span>
+    <span class="flex items-center gap-1.5"><span class="dot bg-k-other"></span>404 / other</span>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <div class="card flex flex-col gap-3.5 px-4 py-[22px] sm:px-6">
+    <div class="flex flex-col gap-1">
+      <h2 class="h2">What AI fetchers read for live answers</h2>
+      <span class="sub">ChatGPT-User, Perplexity-User and Claude-User fetch a page when a person asks a question</span>
+    </div>
+    {{range .Fetchers}}<div class="grid grid-cols-[minmax(0,1fr)_54px_64px] items-center gap-3">
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <a href="/stats/page?{{$.Filter.Query "path" .Path "kind" ""}}" class="truncate font-mono text-xs text-ink no-underline hover:text-link">{{.Path}}</a>
+        <svg viewBox="0 0 100 6" preserveAspectRatio="none" class="block h-1.5 w-full overflow-hidden rounded-full" aria-hidden="true"><rect width="100" height="6" fill="#262B30"/><rect width="{{printf "%.1f" .W}}" height="6" fill="#F6C08A"/></svg>
+      </div>
+      <span class="tag justify-self-start">{{.Format}}</span>
+      <span class="text-right font-mono text-[13px]">{{.Hits}}</span>
+    </div>{{else}}<p class="m-0 text-[13px] text-muted">No AI fetcher Hits in this range.</p>{{end}}
+  </div>
+  <div class="card flex flex-col gap-3.5 px-4 py-[22px] sm:px-6">
+    <div class="flex flex-col gap-1">
+      <h2 class="h2">HTML or Markdown?</h2>
+      <span class="sub">Share of machine fetches served as each format</span>
+    </div>
+    <svg viewBox="0 0 1000 18" preserveAspectRatio="none" class="block h-[18px] w-full overflow-hidden rounded-md" role="img" aria-label="Machine fetches by format">{{range .Formats}}{{if .W}}<rect x="{{printf "%.1f" .X}}" width="{{printf "%.1f" .W}}" height="18" fill="{{.Color}}"><title>{{.Label}}: {{.Pct}}</title></rect>{{end}}{{end}}</svg>
+    <div class="grid grid-cols-1 gap-x-6 gap-y-2.5 text-[13px] sm:grid-cols-2">
+      {{range .Formats}}<span class="flex items-center gap-2"><svg width="10" height="10" class="shrink-0" aria-hidden="true"><rect width="10" height="10" rx="3" fill="{{.Color}}"/></svg>{{.Label}} <span class="ml-auto font-mono text-muted">{{.Pct}}</span></span>{{end}}
+    </div>
+  </div>
+</section>
+
+{{template "timeline" .Timeline}}
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "daybars"}}
+<div class="flex flex-col gap-2">
+  <div class="flex items-baseline justify-between gap-3"><span class="text-[13px] font-medium">{{.Label}}</span><span class="font-mono text-xs text-muted">{{.Total}} in range</span></div>
+  <div class="grid grid-cols-[44px_minmax(0,1fr)] gap-2">
+    <div class="flex h-40 flex-col items-end justify-between font-mono text-[11px] text-muted" aria-hidden="true">{{range .YTicks}}<span>{{.}}</span>{{end}}</div>
+    <svg viewBox="0 0 1000 160" preserveAspectRatio="none" class="block h-40 w-full" role="img" aria-label="{{.Label}} per day">
+      <line x1="0" y1="159.5" x2="1000" y2="159.5" stroke="#3A4046" vector-effect="non-scaling-stroke"/>
+      {{range .Cols}}<rect x="{{printf "%.2f" .X}}" y="{{printf "%.2f" .Y}}" width="{{printf "%.2f" .W}}" height="{{printf "%.2f" .H}}" fill="{{$.Color}}"><title>{{.Title}}</title></rect>{{end}}
+    </svg>
+  </div>
+</div>
+{{end}}
+
+{{define "search"}}{{template "top" .}}{{with .Data}}
+{{template "heading" (heading "Search" "Search Performance as Google Search Console and Bing Webmaster Tools report it: queries, impressions, clicks and average position. Imported daily; not derived from Hits.")}}
+{{if .Tiles}}
+<section aria-label="Totals per search engine" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  {{range .Tiles}}<div class="card flex flex-col gap-3 p-[18px]">
+    <span class="text-[13px] font-medium text-muted">{{.Name}}</span>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <span class="flex flex-col"><span class="text-[26px] font-semibold tabular-nums">{{.Clicks}}</span><span class="text-xs text-muted">clicks</span></span>
+      <span class="flex flex-col"><span class="text-[26px] font-semibold tabular-nums">{{.Impressions}}</span><span class="text-xs text-muted">impressions</span></span>
+      <span class="flex flex-col"><span class="text-[26px] font-semibold tabular-nums">{{.CTR}}</span><span class="text-xs text-muted">click-through</span></span>
+      <span class="flex flex-col"><span class="text-[26px] font-semibold tabular-nums">{{.Position}}</span><span class="text-xs text-muted">avg position</span></span>
+    </div>
+  </div>{{end}}
+</section>
+<section aria-labelledby="search-days" class="card flex flex-col gap-4 px-4 pt-[22px] pb-[18px] sm:px-6">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex flex-col gap-1"><h2 id="search-days" class="h2">Per day</h2><span class="sub">Impressions and clicks across both search engines</span></div>
+    <div class="flex shrink-0 items-center gap-1.5">
+      <a href="{{.SVGHref}}" download class="btn-sm">SVG</a>
+      <button type="button" class="btn-sm" data-png="{{.SVGHref}}" data-name="{{.File}}">PNG</button>
+    </div>
+  </div>
+  {{template "daybars" .Impressions}}
+  {{template "daybars" .Clicks}}
+  <div class="ml-[52px] flex justify-between font-mono text-[11px] text-muted" aria-hidden="true">{{range .XTicks}}<span>{{.}}</span>{{end}}</div>
+</section>
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <div class="card overflow-hidden">
+    <h2 class="h2 px-4 pt-5 pb-3.5 sm:px-6">Top queries</h2>
+    <div role="table" aria-label="Top queries">
+      <div role="row" class="thead grid grid-cols-[minmax(0,1fr)_64px_56px_80px_48px]"><span role="columnheader">Query</span><span role="columnheader">Source</span><span role="columnheader" class="text-right">Clicks</span><span role="columnheader" class="text-right">Impr.</span><span role="columnheader" class="text-right">Pos.</span></div>
+      {{range .Queries}}<div role="row" class="trow grid grid-cols-[minmax(0,1fr)_64px_56px_80px_48px] text-[13px]"><span role="cell" class="truncate">{{.Query}}</span><span role="cell" class="text-muted">{{source .Source}}</span><span role="cell" class="text-right font-mono">{{num .Clicks}}</span><span role="cell" class="text-right font-mono">{{num .Impressions}}</span><span role="cell" class="text-right font-mono text-muted">{{one .AvgPosition}}</span></div>{{end}}
+    </div>
+  </div>
+  <div class="card overflow-hidden">
+    <h2 class="h2 px-4 pt-5 pb-3.5 sm:px-6">Mirror Pages in search</h2>
+    <div role="table" aria-label="Mirror Pages in search">
+      <div role="row" class="thead grid grid-cols-[minmax(0,1fr)_56px_80px_48px]"><span role="columnheader">Page</span><span role="columnheader" class="text-right">Clicks</span><span role="columnheader" class="text-right">Impr.</span><span role="columnheader" class="text-right">Pos.</span></div>
+      {{range .Pages}}<div role="row" class="trow grid grid-cols-[minmax(0,1fr)_56px_80px_48px] text-[13px]"><a role="cell" href="/stats/page?{{$.Filter.Query "path" .Path}}" class="flex min-w-0 flex-col text-ink no-underline hover:text-link"><span class="truncate font-medium">{{if .Title}}{{.Title}}{{else}}{{.Path}}{{end}}</span><span class="truncate font-mono text-xs text-muted">{{.Path}}</span></a><span role="cell" class="text-right font-mono">{{num .Clicks}}</span><span role="cell" class="text-right font-mono">{{num .Impressions}}</span><span role="cell" class="text-right font-mono text-muted">{{one .AvgPosition}}</span></div>{{end}}
+    </div>
+  </div>
+</section>
+{{else}}
+{{template "search-panel" (searchPanel $ (searchSummary .Sources))}}
+{{end}}
+<section id="connect" aria-labelledby="connect-title" class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
+  <h2 id="connect-title" class="h2">Connecting the imports</h2>
+  <p class="m-0 max-w-[760px] leading-normal text-muted">The binary imports the last ten days once a day. Set the variables below on the deployment (secrets arrive via Vault) and restart; an import with empty credentials stays off.</p>
+  <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <div class="flex flex-col gap-1.5 rounded-[10px] border border-hair px-3.5 py-3 text-[13px]">
+      <span class="flex items-center gap-2 font-medium"><span class="size-2 rounded-full {{if .Sources.Google}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span>Google Search Console · {{if .Sources.Google}}connected{{else}}no credentials{{end}}</span>
+      <code class="font-mono text-xs text-muted">GSC_SERVICE_ACCOUNT_JSON</code><code class="font-mono text-xs text-muted">GSC_SITE_URL</code>
+    </div>
+    <div class="flex flex-col gap-1.5 rounded-[10px] border border-hair px-3.5 py-3 text-[13px]">
+      <span class="flex items-center gap-2 font-medium"><span class="size-2 rounded-full {{if .Sources.Bing}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span>Bing Webmaster Tools · {{if .Sources.Bing}}connected{{else}}no credentials{{end}}</span>
+      <code class="font-mono text-xs text-muted">BING_API_KEY</code><code class="font-mono text-xs text-muted">BING_SITE_URL</code>
+    </div>
+  </div>
+</section>
+{{end}}{{template "bottom" .}}{{end}}

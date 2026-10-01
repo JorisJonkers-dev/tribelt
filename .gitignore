@@ -1,6 +1,7 @@
 # Build and test output
 bin/
 web/static/site.css
+web/static/stats.css
 coverage.out
 visits.out
 *.test

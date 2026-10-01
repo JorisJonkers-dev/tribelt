@@ -10,56 +10,178 @@ import (
 	"time"
 )
 
-const agentTopPaths = `-- name: AgentTopPaths :many
-SELECT path, count(*) AS hits,
-       count(*) FILTER (WHERE visitor_kind = 'ai-crawler') AS ai_crawler,
-       count(*) FILTER (WHERE visitor_kind = 'ai-fetcher') AS ai_fetcher,
-       count(*) FILTER (WHERE visitor_kind = 'search-crawler') AS search_crawler
+const aIFetcherPaths = `-- name: AIFetcherPaths :many
+SELECT path, format, count(*) AS hits
 FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND visitor_kind IN ('ai-crawler', 'ai-fetcher', 'search-crawler')
-GROUP BY path
-ORDER BY hits DESC
-LIMIT 50
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND visitor_kind = 'ai-fetcher'
+GROUP BY 1, 2
+ORDER BY 3 DESC, 1
+LIMIT 10
 `
 
-type AgentTopPathsParams struct {
-	FromTs  time.Time
-	ToTs    time.Time
-	Locale  *string
-	Release *string
+type AIFetcherPathsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
 }
 
-type AgentTopPathsRow struct {
-	Path          string
-	Hits          int64
-	AiCrawler     int64
-	AiFetcher     int64
-	SearchCrawler int64
+type AIFetcherPathsRow struct {
+	Path   string
+	Format string
+	Hits   int64
 }
 
-func (q *Queries) AgentTopPaths(ctx context.Context, arg AgentTopPathsParams) ([]AgentTopPathsRow, error) {
-	rows, err := q.db.Query(ctx, agentTopPaths,
+func (q *Queries) AIFetcherPaths(ctx context.Context, arg AIFetcherPathsParams) ([]AIFetcherPathsRow, error) {
+	rows, err := q.db.Query(ctx, aIFetcherPaths,
 		arg.FromTs,
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AgentTopPathsRow{}
+	items := []AIFetcherPathsRow{}
 	for rows.Next() {
-		var i AgentTopPathsRow
+		var i AIFetcherPathsRow
+		if err := rows.Scan(&i.Path, &i.Format, &i.Hits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const agentFileClients = `-- name: AgentFileClients :many
+SELECT resource, (CASE WHEN visitor_kind IN ('human', 'human-unconfirmed') THEN 'Browsers' ELSE COALESCE(bot_name, 'unknown') END)::text AS client,
+       count(*) AS hits
+FROM hits
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND resource IN ('robots', 'llms', 'llms_full', 'markdown')
+GROUP BY 1, 2
+ORDER BY 3 DESC, 2
+`
+
+type AgentFileClientsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type AgentFileClientsRow struct {
+	Resource string
+	Client   string
+	Hits     int64
+}
+
+func (q *Queries) AgentFileClients(ctx context.Context, arg AgentFileClientsParams) ([]AgentFileClientsRow, error) {
+	rows, err := q.db.Query(ctx, agentFileClients,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AgentFileClientsRow{}
+	for rows.Next() {
+		var i AgentFileClientsRow
+		if err := rows.Scan(&i.Resource, &i.Client, &i.Hits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const botKinds = `-- name: BotKinds :many
+SELECT visitor_kind, count(*) AS hits, count(*) FILTER (WHERE verified) AS verified,
+       count(DISTINCT path) FILTER (WHERE page_id IS NOT NULL) AS pages
+FROM hits
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND visitor_kind NOT IN ('human', 'human-unconfirmed') AND resource <> 'image'
+GROUP BY visitor_kind
+ORDER BY hits DESC
+`
+
+type BotKindsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type BotKindsRow struct {
+	VisitorKind string
+	Hits        int64
+	Verified    int64
+	Pages       int64
+}
+
+func (q *Queries) BotKinds(ctx context.Context, arg BotKindsParams) ([]BotKindsRow, error) {
+	rows, err := q.db.Query(ctx, botKinds,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BotKindsRow{}
+	for rows.Next() {
+		var i BotKindsRow
 		if err := rows.Scan(
-			&i.Path,
+			&i.VisitorKind,
 			&i.Hits,
-			&i.AiCrawler,
-			&i.AiFetcher,
-			&i.SearchCrawler,
+			&i.Verified,
+			&i.Pages,
 		); err != nil {
 			return nil, err
 		}
@@ -72,37 +194,53 @@ func (q *Queries) AgentTopPaths(ctx context.Context, arg AgentTopPathsParams) ([
 }
 
 const botTable = `-- name: BotTable :many
-SELECT COALESCE(bot_name, '')::text AS bot_name, visitor_kind, COALESCE(verified, false)::boolean AS verified,
-       count(*) AS hits, count(DISTINCT path) AS paths,
-       count(*) FILTER (WHERE format = 'md') AS markdown, count(*) FILTER (WHERE format = 'txt') AS txt,
-       count(*) FILTER (WHERE format = 'xml') AS xml, max(ts)::timestamptz AS last_seen
+SELECT COALESCE(bot_name, '')::text AS bot_name, visitor_kind,
+       count(*) AS hits, count(*) FILTER (WHERE verified) AS verified, count(*) FILTER (WHERE verified IS NOT NULL) AS checked,
+       count(DISTINCT path) FILTER (WHERE page_id IS NOT NULL) AS pages,
+       count(*) FILTER (WHERE resource = 'page') AS page,
+       count(*) FILTER (WHERE resource = 'markdown') AS markdown,
+       count(*) FILTER (WHERE resource = 'robots') AS robots,
+       count(*) FILTER (WHERE resource IN ('llms', 'llms_full')) AS llms,
+       count(*) FILTER (WHERE resource = 'sitemap') AS sitemap,
+       count(*) FILTER (WHERE resource IN ('image', 'redirect', 'not_found')) AS other,
+       max(ts)::timestamptz AS last_seen
 FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::text IS NULL OR path = $5)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND ($8::text IS NULL OR (CASE WHEN resource = 'markdown' AND path = '/index.md' THEN '/' WHEN resource = 'markdown' THEN regexp_replace(path, '\.md$', '') ELSE path END) = $8)
   AND visitor_kind NOT IN ('human', 'human-unconfirmed')
-GROUP BY 1, 2, 3
-ORDER BY hits DESC
+GROUP BY 1, 2
+ORDER BY hits DESC, bot_name
 `
 
 type BotTableParams struct {
-	FromTs  time.Time
-	ToTs    time.Time
-	Locale  *string
-	Release *string
-	Path    *string
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+	Path            *string
 }
 
 type BotTableRow struct {
 	BotName     string
 	VisitorKind string
-	Verified    bool
 	Hits        int64
-	Paths       int64
+	Verified    int64
+	Checked     int64
+	Pages       int64
+	Page        int64
 	Markdown    int64
-	Txt         int64
-	Xml         int64
+	Robots      int64
+	Llms        int64
+	Sitemap     int64
+	Other       int64
 	LastSeen    time.Time
 }
 
@@ -112,6 +250,9 @@ func (q *Queries) BotTable(ctx context.Context, arg BotTableParams) ([]BotTableR
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
 		arg.Path,
 	)
 	if err != nil {
@@ -124,12 +265,16 @@ func (q *Queries) BotTable(ctx context.Context, arg BotTableParams) ([]BotTableR
 		if err := rows.Scan(
 			&i.BotName,
 			&i.VisitorKind,
-			&i.Verified,
 			&i.Hits,
-			&i.Paths,
+			&i.Verified,
+			&i.Checked,
+			&i.Pages,
+			&i.Page,
 			&i.Markdown,
-			&i.Txt,
-			&i.Xml,
+			&i.Robots,
+			&i.Llms,
+			&i.Sitemap,
+			&i.Other,
 			&i.LastSeen,
 		); err != nil {
 			return nil, err
@@ -150,7 +295,9 @@ FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
   AND visitor_kind IN ('human', 'human-unconfirmed') AND format = 'html'
 GROUP BY 1
 ORDER BY 2 DESC
@@ -161,6 +308,8 @@ type ChannelTotalsParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -177,6 +326,8 @@ func (q *Queries) ChannelTotals(ctx context.Context, arg ChannelTotalsParams) ([
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -202,14 +353,74 @@ func (q *Queries) ChannelTotals(ctx context.Context, arg ChannelTotalsParams) ([
 	return items, nil
 }
 
+const dailyHumanVisitors = `-- name: DailyHumanVisitors :many
+SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::date AS day, count(DISTINCT COALESCE(visitor_id, daily_hash)) AS visitors
+FROM hits
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND visitor_kind IN ('human', 'human-unconfirmed') AND resource IN ('page', 'markdown')
+GROUP BY 1
+ORDER BY 1
+`
+
+type DailyHumanVisitorsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type DailyHumanVisitorsRow struct {
+	Day      time.Time
+	Visitors int64
+}
+
+func (q *Queries) DailyHumanVisitors(ctx context.Context, arg DailyHumanVisitorsParams) ([]DailyHumanVisitorsRow, error) {
+	rows, err := q.db.Query(ctx, dailyHumanVisitors,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DailyHumanVisitorsRow{}
+	for rows.Next() {
+		var i DailyHumanVisitorsRow
+		if err := rows.Scan(&i.Day, &i.Visitors); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const dailyKinds = `-- name: DailyKinds :many
 SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::date AS day, visitor_kind, count(*) AS hits
 FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
-  AND ($6::text IS NULL OR path = $6)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND ($8::text IS NULL OR (CASE WHEN resource = 'markdown' AND path = '/index.md' THEN '/' WHEN resource = 'markdown' THEN regexp_replace(path, '\.md$', '') ELSE path END) = $8)
+  AND resource <> 'image'
 GROUP BY 1, 2
 ORDER BY 1, 2
 `
@@ -219,6 +430,8 @@ type DailyKindsParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 	Path            *string
 }
@@ -235,6 +448,8 @@ func (q *Queries) DailyKinds(ctx context.Context, arg DailyKindsParams) ([]Daily
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 		arg.Path,
 	)
@@ -256,11 +471,128 @@ func (q *Queries) DailyKinds(ctx context.Context, arg DailyKindsParams) ([]Daily
 	return items, nil
 }
 
+const dailyOutbound = `-- name: DailyOutbound :many
+SELECT (ts AT TIME ZONE 'Europe/Amsterdam')::date AS day, count(*) AS clicks
+FROM outbound_clicks
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+GROUP BY 1
+ORDER BY 1
+`
+
+type DailyOutboundParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type DailyOutboundRow struct {
+	Day    time.Time
+	Clicks int64
+}
+
+func (q *Queries) DailyOutbound(ctx context.Context, arg DailyOutboundParams) ([]DailyOutboundRow, error) {
+	rows, err := q.db.Query(ctx, dailyOutbound,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DailyOutboundRow{}
+	for rows.Next() {
+		var i DailyOutboundRow
+		if err := rows.Scan(&i.Day, &i.Clicks); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const dailyPathHumans = `-- name: DailyPathHumans :many
+SELECT path, (ts AT TIME ZONE 'Europe/Amsterdam')::date AS day, count(*) AS hits
+FROM hits
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND path = ANY ($8::text [])
+  AND visitor_kind IN ('human', 'human-unconfirmed')
+GROUP BY 1, 2
+ORDER BY 1, 2
+`
+
+type DailyPathHumansParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+	Paths           []string
+}
+
+type DailyPathHumansRow struct {
+	Path string
+	Day  time.Time
+	Hits int64
+}
+
+func (q *Queries) DailyPathHumans(ctx context.Context, arg DailyPathHumansParams) ([]DailyPathHumansRow, error) {
+	rows, err := q.db.Query(ctx, dailyPathHumans,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+		arg.Paths,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DailyPathHumansRow{}
+	for rows.Next() {
+		var i DailyPathHumansRow
+		if err := rows.Scan(&i.Path, &i.Day, &i.Hits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const firstTouchChannels = `-- name: FirstTouchChannels :many
 WITH first_hits AS (
     SELECT DISTINCT ON (visitor_id) visitor_id, ts, arrival_channel
     FROM hits
-    WHERE visitor_id IS NOT NULL AND visitor_kind IN ('human', 'human-unconfirmed')
+    WHERE visitor_id IS NOT NULL AND visitor_kind IN ('human', 'human-unconfirmed') AND resource IN ('page', 'markdown')
       AND ($3::boolean OR NOT internal)
     ORDER BY visitor_id, ts
 )
@@ -309,7 +641,10 @@ FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND resource <> 'image'
 GROUP BY visitor_kind
 ORDER BY visitor_kind
 `
@@ -319,6 +654,8 @@ type KindTotalsParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -328,13 +665,16 @@ type KindTotalsRow struct {
 	Visitors    int64
 }
 
-// Every stats query shares one filter: [from_ts, to_ts), optional locale and release, internal toggle.
+// Every stats query shares one filter: [from_ts, to_ts), optional locale, release label, app version and
+// release tag, and the internal toggle. Image Hits only count in the resource breakdowns.
 func (q *Queries) KindTotals(ctx context.Context, arg KindTotalsParams) ([]KindTotalsRow, error) {
 	rows, err := q.db.Query(ctx, kindTotals,
 		arg.FromTs,
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -355,13 +695,116 @@ func (q *Queries) KindTotals(ctx context.Context, arg KindTotalsParams) ([]KindT
 	return items, nil
 }
 
+const markdownPages = `-- name: MarkdownPages :one
+SELECT count(DISTINCT path) AS pages
+FROM hits
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND resource = 'markdown'
+`
+
+type MarkdownPagesParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+func (q *Queries) MarkdownPages(ctx context.Context, arg MarkdownPagesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, markdownPages,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	var pages int64
+	err := row.Scan(&pages)
+	return pages, err
+}
+
+const outboundBreakdown = `-- name: OutboundBreakdown :many
+SELECT visitor_kind, COALESCE(bot_name, '')::text AS bot_name, target, count(*) AS clicks
+FROM outbound_clicks
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC
+LIMIT 500
+`
+
+type OutboundBreakdownParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type OutboundBreakdownRow struct {
+	VisitorKind string
+	BotName     string
+	Target      string
+	Clicks      int64
+}
+
+func (q *Queries) OutboundBreakdown(ctx context.Context, arg OutboundBreakdownParams) ([]OutboundBreakdownRow, error) {
+	rows, err := q.db.Query(ctx, outboundBreakdown,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OutboundBreakdownRow{}
+	for rows.Next() {
+		var i OutboundBreakdownRow
+		if err := rows.Scan(
+			&i.VisitorKind,
+			&i.BotName,
+			&i.Target,
+			&i.Clicks,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const outboundByPage = `-- name: OutboundByPage :many
 SELECT from_path, count(*) AS clicks, count(*) FILTER (WHERE visitor_kind IN ('human', 'human-unconfirmed')) AS human_clicks
 FROM outbound_clicks
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
 GROUP BY from_path
 `
 
@@ -370,6 +813,8 @@ type OutboundByPageParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -385,6 +830,8 @@ func (q *Queries) OutboundByPage(ctx context.Context, arg OutboundByPageParams) 
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -410,7 +857,9 @@ SELECT release_label, count(*) AS clicks, count(*) FILTER (WHERE visitor_kind IN
 FROM outbound_clicks
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
-  AND ($4::boolean OR NOT internal)
+  AND ($4::text IS NULL OR app_version = $4)
+  AND ($5::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $5::text = ANY (r.tags)))
+  AND ($6::boolean OR NOT internal)
 GROUP BY release_label
 `
 
@@ -418,6 +867,8 @@ type OutboundByReleaseParams struct {
 	FromTs          time.Time
 	ToTs            time.Time
 	Locale          *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -432,6 +883,8 @@ func (q *Queries) OutboundByRelease(ctx context.Context, arg OutboundByReleasePa
 		arg.FromTs,
 		arg.ToTs,
 		arg.Locale,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -458,7 +911,9 @@ FROM outbound_clicks
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
 GROUP BY visitor_kind
 ORDER BY visitor_kind
 `
@@ -468,6 +923,8 @@ type OutboundTotalsParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -482,6 +939,8 @@ func (q *Queries) OutboundTotals(ctx context.Context, arg OutboundTotalsParams) 
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -505,9 +964,13 @@ func (q *Queries) OutboundTotals(ctx context.Context, arg OutboundTotalsParams) 
 const pageReferrers = `-- name: PageReferrers :many
 SELECT COALESCE(arrival_channel, 'direct')::text AS channel, COALESCE(referrer_host, '')::text AS referrer_host, count(*) AS hits
 FROM hits
-WHERE ts >= $1 AND ts < $2 AND path = $3
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+  AND path = $8
   AND visitor_kind IN ('human', 'human-unconfirmed')
 GROUP BY 1, 2
 ORDER BY 3 DESC
@@ -517,9 +980,12 @@ LIMIT 50
 type PageReferrersParams struct {
 	FromTs          time.Time
 	ToTs            time.Time
-	Path            string
+	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
+	Path            string
 }
 
 type PageReferrersRow struct {
@@ -532,9 +998,12 @@ func (q *Queries) PageReferrers(ctx context.Context, arg PageReferrersParams) ([
 	rows, err := q.db.Query(ctx, pageReferrers,
 		arg.FromTs,
 		arg.ToTs,
-		arg.Path,
+		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
+		arg.Path,
 	)
 	if err != nil {
 		return nil, err
@@ -555,7 +1024,7 @@ func (q *Queries) PageReferrers(ctx context.Context, arg PageReferrersParams) ([
 }
 
 const pageTable = `-- name: PageTable :many
-SELECT path, max(page_id)::text AS page_id, max(locale)::text AS locale,
+SELECT (CASE WHEN resource = 'markdown' AND path = '/index.md' THEN '/' WHEN resource = 'markdown' THEN regexp_replace(path, '\.md$', '') ELSE path END)::text AS path, max(page_id)::text AS page_id, max(locale)::text AS locale,
        count(*) FILTER (WHERE visitor_kind = 'human') AS human,
        count(*) FILTER (WHERE visitor_kind = 'human-unconfirmed') AS human_unconfirmed,
        count(*) FILTER (WHERE visitor_kind = 'search-crawler') AS search_crawler,
@@ -568,10 +1037,12 @@ FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
   AND ($4::text IS NULL OR release_label = $4)
-  AND ($5::boolean OR NOT internal)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
   AND page_id IS NOT NULL
-GROUP BY path
-ORDER BY human DESC, human_unconfirmed DESC, path
+GROUP BY 1
+ORDER BY human DESC, human_unconfirmed DESC, 1
 `
 
 type PageTableParams struct {
@@ -579,6 +1050,8 @@ type PageTableParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -596,12 +1069,15 @@ type PageTableRow struct {
 	AvgEngagedMs     int64
 }
 
+// A Markdown twin (/x.md, /index.md) counts towards its page's path.
 func (q *Queries) PageTable(ctx context.Context, arg PageTableParams) ([]PageTableRow, error) {
 	rows, err := q.db.Query(ctx, pageTable,
 		arg.FromTs,
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -645,11 +1121,16 @@ SELECT release_label,
        count(*) FILTER (WHERE visitor_kind IN ('seo-tool', 'other-bot')) AS other,
        count(*) FILTER (WHERE visitor_kind IN ('human', 'human-unconfirmed') AND arrival_channel = 'search') AS from_search,
        count(*) FILTER (WHERE visitor_kind IN ('human', 'human-unconfirmed') AND arrival_channel = 'ai-chat') AS from_ai_chat,
+       count(*) FILTER (WHERE visitor_kind NOT IN ('human', 'human-unconfirmed') AND resource = 'markdown') AS markdown,
+       count(*) FILTER (WHERE visitor_kind NOT IN ('human', 'human-unconfirmed') AND resource IN ('llms', 'llms_full')) AS llms,
        count(DISTINCT visitor_id) AS visitors
 FROM hits
 WHERE ts >= $1 AND ts < $2
   AND ($3::text IS NULL OR locale = $3)
-  AND ($4::boolean OR NOT internal)
+  AND ($4::text IS NULL OR app_version = $4)
+  AND ($5::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $5::text = ANY (r.tags)))
+  AND ($6::boolean OR NOT internal)
+  AND resource <> 'image'
 GROUP BY release_label
 `
 
@@ -657,6 +1138,8 @@ type ReleaseTotalsParams struct {
 	FromTs          time.Time
 	ToTs            time.Time
 	Locale          *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -671,6 +1154,8 @@ type ReleaseTotalsRow struct {
 	Other            int64
 	FromSearch       int64
 	FromAiChat       int64
+	Markdown         int64
+	Llms             int64
 	Visitors         int64
 }
 
@@ -679,6 +1164,8 @@ func (q *Queries) ReleaseTotals(ctx context.Context, arg ReleaseTotalsParams) ([
 		arg.FromTs,
 		arg.ToTs,
 		arg.Locale,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	if err != nil {
@@ -699,8 +1186,189 @@ func (q *Queries) ReleaseTotals(ctx context.Context, arg ReleaseTotalsParams) ([
 			&i.Other,
 			&i.FromSearch,
 			&i.FromAiChat,
+			&i.Markdown,
+			&i.Llms,
 			&i.Visitors,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resourceKinds = `-- name: ResourceKinds :many
+SELECT resource, visitor_kind, count(*) AS hits
+FROM hits
+WHERE ts >= $1 AND ts < $2
+  AND ($3::text IS NULL OR locale = $3)
+  AND ($4::text IS NULL OR release_label = $4)
+  AND ($5::text IS NULL OR app_version = $5)
+  AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+  AND ($7::boolean OR NOT internal)
+GROUP BY 1, 2
+ORDER BY 1, 2
+`
+
+type ResourceKindsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type ResourceKindsRow struct {
+	Resource    string
+	VisitorKind string
+	Hits        int64
+}
+
+func (q *Queries) ResourceKinds(ctx context.Context, arg ResourceKindsParams) ([]ResourceKindsRow, error) {
+	rows, err := q.db.Query(ctx, resourceKinds,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResourceKindsRow{}
+	for rows.Next() {
+		var i ResourceKindsRow
+		if err := rows.Scan(&i.Resource, &i.VisitorKind, &i.Hits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resourceTopClients = `-- name: ResourceTopClients :many
+SELECT DISTINCT ON (resource) resource, client, hits
+FROM (
+    SELECT resource,
+           (CASE WHEN visitor_kind IN ('human', 'human-unconfirmed') THEN 'Browsers' ELSE COALESCE(bot_name, 'unknown') END)::text AS client,
+           count(*) AS hits
+    FROM hits
+    WHERE ts >= $1 AND ts < $2
+      AND ($3::text IS NULL OR locale = $3)
+      AND ($4::text IS NULL OR release_label = $4)
+      AND ($5::text IS NULL OR app_version = $5)
+      AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+      AND ($7::boolean OR NOT internal)
+    GROUP BY 1, 2
+) AS c
+ORDER BY resource, hits DESC, client
+`
+
+type ResourceTopClientsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type ResourceTopClientsRow struct {
+	Resource string
+	Client   string
+	Hits     int64
+}
+
+func (q *Queries) ResourceTopClients(ctx context.Context, arg ResourceTopClientsParams) ([]ResourceTopClientsRow, error) {
+	rows, err := q.db.Query(ctx, resourceTopClients,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResourceTopClientsRow{}
+	for rows.Next() {
+		var i ResourceTopClientsRow
+		if err := rows.Scan(&i.Resource, &i.Client, &i.Hits); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resourceTopPaths = `-- name: ResourceTopPaths :many
+SELECT DISTINCT ON (resource) resource, path, hits
+FROM (
+    SELECT resource, path, count(*) AS hits
+    FROM hits
+    WHERE ts >= $1 AND ts < $2
+      AND ($3::text IS NULL OR locale = $3)
+      AND ($4::text IS NULL OR release_label = $4)
+      AND ($5::text IS NULL OR app_version = $5)
+      AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+      AND ($7::boolean OR NOT internal)
+    GROUP BY 1, 2
+) AS p
+ORDER BY resource, hits DESC, path
+`
+
+type ResourceTopPathsParams struct {
+	FromTs          time.Time
+	ToTs            time.Time
+	Locale          *string
+	Release         *string
+	Version         *string
+	Tag             *string
+	IncludeInternal bool
+}
+
+type ResourceTopPathsRow struct {
+	Resource string
+	Path     string
+	Hits     int64
+}
+
+func (q *Queries) ResourceTopPaths(ctx context.Context, arg ResourceTopPathsParams) ([]ResourceTopPathsRow, error) {
+	rows, err := q.db.Query(ctx, resourceTopPaths,
+		arg.FromTs,
+		arg.ToTs,
+		arg.Locale,
+		arg.Release,
+		arg.Version,
+		arg.Tag,
+		arg.IncludeInternal,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResourceTopPathsRow{}
+	for rows.Next() {
+		var i ResourceTopPathsRow
+		if err := rows.Scan(&i.Resource, &i.Path, &i.Hits); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -718,8 +1386,10 @@ WITH h AS (
     WHERE ts >= $1 AND ts < $2
       AND ($3::text IS NULL OR locale = $3)
       AND ($4::text IS NULL OR release_label = $4)
-      AND ($5::boolean OR NOT internal)
-      AND visitor_kind IN ('human', 'human-unconfirmed')
+      AND ($5::text IS NULL OR app_version = $5)
+      AND ($6::text IS NULL OR release_label IN (SELECT r.label FROM releases AS r WHERE $6::text = ANY (r.tags)))
+      AND ($7::boolean OR NOT internal)
+      AND visitor_kind IN ('human', 'human-unconfirmed') AND resource IN ('page', 'markdown')
 )
 SELECT
     (SELECT count(DISTINCT visitor_id) FROM h WHERE visitor_id IS NOT NULL) AS visitors,
@@ -734,6 +1404,8 @@ type VisitorSummaryParams struct {
 	ToTs            time.Time
 	Locale          *string
 	Release         *string
+	Version         *string
+	Tag             *string
 	IncludeInternal bool
 }
 
@@ -749,6 +1421,8 @@ func (q *Queries) VisitorSummary(ctx context.Context, arg VisitorSummaryParams) 
 		arg.ToTs,
 		arg.Locale,
 		arg.Release,
+		arg.Version,
+		arg.Tag,
 		arg.IncludeInternal,
 	)
 	var i VisitorSummaryRow
