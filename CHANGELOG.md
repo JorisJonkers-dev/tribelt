@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.4.0...v0.5.0) (2026-10-01)
+
+
+### Features
+
+* **stats:** admin Integrations page for Search Console, Bing, IndexNow and Cloudflare ([#11](https://github.com/JorisJonkers-dev/tribelt/issues/11)) ([051688f](https://github.com/JorisJonkers-dev/tribelt/commit/051688f782264bae144bbe349713da50c2ec7523))
+
 ## [0.4.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.3.0...v0.4.0) (2026-10-01)
 
 
