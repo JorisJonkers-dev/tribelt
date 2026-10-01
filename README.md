@@ -15,10 +15,11 @@ One Go binary serves everything:
   asynchronously to Postgres (a page never waits on the database). `/b` is the beacon, `/go` records
   an Outbound Click and redirects to tribelt.nl.
 - **`/stats`** for Stats Viewers (OIDC against auth-api): Overview, Pages (and page detail), Releases
-  (compare two Content Releases), AI & crawlers, Search; CSV/SVG/PNG exports and an anonymised
-  SQLite download.
-- A daily **Search Performance** import from Google Search Console and Bing Webmaster Tools, off
-  when their credentials are empty.
+  (compare two Content Releases), AI & crawlers, Search, Integrations; CSV/SVG/PNG exports and an
+  anonymised SQLite download.
+- **Integrations** an admin connects in `/stats` (ADR-0005): a daily **Search Performance** import from
+  Google Search Console and Bing Webmaster Tools, **IndexNow** submissions, and Cloudflare's edge
+  request counts compared with Hits.
 
 ```
 cmd/tribelt            main: serve (default), migrate
@@ -28,7 +29,8 @@ internal/content       load + validate content, render HTML, JSON-LD, sitemap, r
 internal/site          serves the pre-rendered resources, redirects, negotiation, 404s
 internal/visits        pure classification (Visitor Kind, crawler ranges, Arrival Channel, identities)
 internal/hits          tracking middleware, async writer, /b beacon, /go outbound
-internal/stats         stats views, charts, CSV, SQLite export, Search Performance import
+internal/stats         stats views, charts, CSV, SQLite export, the Integrations page
+internal/integrations  Integration credentials (sealed), GSC/Bing/IndexNow/Cloudflare clients, schedule
 internal/release       records the running Content Release and page snapshots
 internal/platform      config, pg (goose + sqlc), oidc, session, httpx
 db/migrations, db/queries, web/templates, web/static, tests/e2e, platform/
@@ -50,8 +52,8 @@ task update-ranges  # refresh the bundled crawler IP ranges
 ```
 
 `task dev` reads `content/` from disk (`CONTENT_DIR=content`), so a content edit only needs a
-restart. `DEV_AUTH_BYPASS=1` opens `/stats` without sign-in and is refused when
-`TRIBELT_ENV=production`. There is no localhost redirect registered at auth-api, so the real OIDC
+restart. `DEV_AUTH_BYPASS=1` opens `/stats` without sign-in as an admin
+(`DEV_AUTH_BYPASS=viewer` as a read-only Stats Viewer) and is refused when `TRIBELT_ENV=production`. There is no localhost redirect registered at auth-api, so the real OIDC
 flow is exercised by the fake-issuer tests, not locally.
 
 Try it:
@@ -154,15 +156,42 @@ are all filters on every stats view.
 | `BASE_URL` | public origin; https turns on Secure cookies and HSTS |
 | `TRIBELT_ENV` | `production` demands OIDC, `VISITOR_HMAC_KEY` and https, and refuses the bypass |
 | `OIDC_ISSUER` `OIDC_CLIENT_ID` `OIDC_CLIENT_SECRET` `OIDC_REDIRECT_URL` | stats sign-in (discovery, PKCE, state, nonce) |
-| `SESSION_KEY` | at least 32 characters; encrypts the `__Host-` session cookie |
+| `SESSION_KEY` | at least 32 characters; encrypts the `__Host-` session cookie and, through HKDF, the Integration credentials (ADR-0005) |
 | `VISITOR_HMAC_KEY` | derives the daily Daily Visitor salt |
-| `GSC_SERVICE_ACCOUNT_JSON` `GSC_SITE_URL` | Search Console import; empty = off |
-| `BING_API_KEY` `BING_SITE_URL` | Bing Webmaster import; empty = off |
-| `DEV_AUTH_BYPASS` | `1` opens `/stats` in development only |
+| `GSC_SERVICE_ACCOUNT_JSON` `GSC_SITE_URL` | Search Console import "managed by Vault"; empty = unset; a credential saved in the UI wins |
+| `BING_API_KEY` `BING_SITE_URL` | Bing Webmaster import "managed by Vault"; empty = unset; a credential saved in the UI wins |
+| `DEV_AUTH_BYPASS` | `1` opens `/stats` as an admin, `viewer` read-only; development only |
 | `CONTENT_DIR` | read content from disk instead of the embedded copy |
 
 Stats access is granted at auth-api's authorize endpoint (service permission `TRIBELT`) and
 checked again here: the ID token's `roles` must contain `SERVICE_TRIBELT` or `ROLE_ADMIN`.
+
+## Integrations
+
+`/stats/integrations` has one card per Integration: status, source (saved in the UI or managed by
+Vault), selected property, site or zone, last and next sync, stored rows, and inline setup steps.
+Only `ROLE_ADMIN` sees the forms and may connect, test, sync, pause, replace or remove; every change
+is a POST with a per-session CSRF token, removal asks again in a second POST, and a `SERVICE_TRIBELT`
+viewer gets the same page read-only. Credentials are sealed in Postgres (ADR-0005) and never shown
+again; the card shows a fingerprint, who saved it and when, and the audit history.
+
+- **Google Search Console**: upload or paste a service account JSON key (64 KB at most), add its
+  `client_email` as a user of the property, then pick the property from the ones the account can see.
+- **Bing Webmaster Tools**: paste the API key, then pick one of the key owner's verified sites.
+- The Search Performance import runs once a day; a first run (and every new credential or property)
+  backfills from the launch on 30 September 2026 or the API's oldest day, whichever is later, then
+  re-imports the last ten days.
+- **IndexNow**: generate a key; it is served at `/<key>.txt`. That file is protocol plumbing, not
+  content, so it is never a Hit. "Notify now" submits every Mirror Page; on startup, when the Content
+  Release label differs from the last one served, the pages whose content hash changed (and removed
+  ones) are submitted. Batches hold at most 10,000 URLs on this host; each one is logged with its
+  HTTP status.
+- **Cloudflare analytics**: an API token with only *Zone → Analytics: Read* on the zone, plus the
+  zone ID. A daily import reads `httpRequestsAdaptiveGroups` per UTC day for this host: totals and,
+  as far as the plan allows (read from the GraphQL settings node), user agent, path, edge status and
+  verified bot category. The card names the breakdowns the plan lacks; the "Edge versus origin"
+  panel compares edge requests with Hits and AI agents at the edge with those that reached the site,
+  which shows edge blocking such as "Block AI bots".
 
 ## Deploying tribelt.jorisjonkers.dev
 
