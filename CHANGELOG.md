@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.5.0...v0.6.0) (2026-10-01)
+
+
+### Features
+
+* **auth:** local accounts with live roles from auth-api and tribelt-only sign-out ([#14](https://github.com/JorisJonkers-dev/tribelt/issues/14)) ([7b1c22f](https://github.com/JorisJonkers-dev/tribelt/commit/7b1c22f5c1857d685d7e3c8af81fc57d6d527425))
+
 ## [0.5.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.4.0...v0.5.0) (2026-10-01)
 
 
