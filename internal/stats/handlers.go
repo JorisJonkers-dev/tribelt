@@ -44,7 +44,11 @@ type Service struct {
 
 func funcs() template.FuncMap {
 	return template.FuncMap{
-		"num":       num,
+		"num": num,
+		// qs keeps a query string's & and = intact after the ? of an href.
+		"qs": func(f Filter, extra ...string) template.URL {
+			return template.URL(f.Query(extra...)) //nolint:gosec // url.Values.Encode escapes every value
+		},
 		"one":       one,
 		"two":       func(f float64) string { return strconv.FormatFloat(f, 'f', 2, 64) },
 		"f1":        func(f float64) string { return strconv.FormatFloat(f, 'f', 1, 64) },

@@ -391,6 +391,7 @@ func TestHTTPViews(t *testing.T) {
 	s := seed(t)
 	q := "?" + week().Query()
 	inline := regexp.MustCompile(`\sstyle=|<script>|<script [^>]*>[^<]|\son[a-z]+=`)
+	escaped := regexp.MustCompile(`href="[^"]*\?[^"]*%(3[dD]|26)`)
 	for target, want := range map[string][]string{
 		"/stats" + q: {"What was fetched", "Who reads the mirror", "Returning Visitors", "Top Mirror Pages"},
 		"/stats/" + q + "&hide=human&scale=share": {"How people arrive", `data-off`},
@@ -412,6 +413,9 @@ func TestHTTPViews(t *testing.T) {
 		}
 		if strings.Contains(body, "ZgotmplZ") || inline.MatchString(body) {
 			t.Errorf("%s: template escaping or inline style/script under the CSP: %v", target, inline.FindString(body))
+		}
+		if bad := escaped.FindString(body); bad != "" {
+			t.Errorf("%s: a link's query string is escaped and loses the filter: %s", target, bad)
 		}
 	}
 	if rec := get(t, s, "/stats/page"+q); rec.Code != http.StatusFound {
