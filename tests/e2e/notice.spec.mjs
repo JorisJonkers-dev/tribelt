@@ -68,3 +68,23 @@ test("without JavaScript the pill never shows; the top bar does", async ({ brows
   await expect(notice(page)).toBeHidden();
   await context.close();
 });
+
+test("the bar and pill are large enough to notice", async ({ page }) => {
+  await page.goto("/");
+  const bar = await page.locator("aside.testbar").boundingBox();
+  expect(bar.height).toBeGreaterThanOrEqual(64);
+  const fontSize = await notice(page).evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(fontSize).toBeGreaterThanOrEqual(20);
+});
+
+test("curl and crawlers get the page without the bar, the pill or its script", async ({ playwright }) => {
+  for (const ua of ["curl/8.7.1", "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)"]) {
+    const api = await playwright.request.newContext({ baseURL: test.info().project.use.baseURL, userAgent: ua });
+    const body = await (await api.get("/")).text();
+    expect(body).toContain("<h1");
+    expect(body).not.toContain('class="testbar"');
+    expect(body).not.toContain('class="notice"');
+    expect(body).not.toContain("notice.js");
+    await api.dispose();
+  }
+});

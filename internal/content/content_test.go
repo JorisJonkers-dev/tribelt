@@ -263,7 +263,7 @@ func TestBuildPage(t *testing.T) {
 	if strings.Contains(doc, "Studententestsite, niet de officiële site van Tribelt.") {
 		t.Error("the footer note is replaced by the test-site bar")
 	}
-	signedIn := string(bytes.Join(res.Parts("HIT", true), nil))
+	signedIn := string(bytes.Join(res.Parts("HIT", true, true), nil))
 	if !strings.Contains(signedIn, `<a class="auth" href="/stats" rel="nofollow" aria-label="Statistieken">`) || strings.Contains(signedIn, "/auth/login") {
 		t.Error("a Stats Viewer gets the stats button")
 	}
@@ -447,6 +447,37 @@ func TestDesignImages(t *testing.T) {
 		static["img/credits.yml"] = &fstest.MapFile{Data: []byte(yml)}
 		if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "credits.yml") {
 			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestSplit(t *testing.T) {
+	segs, err := split([]byte("a" + HumanStart + "b" + HitPlaceholder + HumanEnd + "c" + AuthPlaceholder + HumanStart + "d" + HumanEnd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Resource{segments: segs, SignedOut: []byte("[out]"), SignedIn: []byte("[in]")}
+	for _, c := range []struct {
+		signedIn, human bool
+		want            string
+	}{
+		{false, true, "abHITc[out]d"},
+		{true, false, "ac[in]"},
+	} {
+		if got := string(bytes.Join(r.Parts("HIT", c.signedIn, c.human), nil)); got != c.want {
+			t.Errorf("Parts(%v, %v) = %q, want %q", c.signedIn, c.human, got, c.want)
+		}
+	}
+	for _, bad := range []string{
+		"no placeholders",
+		HitPlaceholder,
+		AuthPlaceholder,
+		HitPlaceholder + AuthPlaceholder + HumanStart,
+		HitPlaceholder + AuthPlaceholder + HumanEnd,
+		HitPlaceholder + AuthPlaceholder + HumanStart + HumanStart + HumanEnd,
+	} {
+		if _, err := split([]byte(bad)); err == nil {
+			t.Errorf("split(%q) accepted", bad)
 		}
 	}
 }

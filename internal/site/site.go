@@ -9,6 +9,7 @@ import (
 
 	"github.com/JorisJonkers-dev/tribelt/internal/content"
 	"github.com/JorisJonkers-dev/tribelt/internal/hits"
+	"github.com/JorisJonkers-dev/tribelt/internal/visits"
 )
 
 // Handler serves everything in a content.Built.
@@ -61,10 +62,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.serveText(w, r, h.Built.Markdown[p])
 			return
 		}
-		serveHTML(w, r, res, info.HitID.String(), h.signedIn(r), http.StatusOK)
+		h.serveHTML(w, r, res, info.HitID.String(), http.StatusOK)
 		return
 	}
-	serveHTML(w, r, h.Built.NotFound[info.Locale], info.HitID.String(), h.signedIn(r), http.StatusNotFound)
+	h.serveHTML(w, r, h.Built.NotFound[info.Locale], info.HitID.String(), http.StatusNotFound)
 }
 
 func (h *Handler) signedIn(r *http.Request) bool { return h.Viewer != nil && h.Viewer(r) }
@@ -76,15 +77,18 @@ func redirect(w http.ResponseWriter, r *http.Request, to string) {
 	http.Redirect(w, r, to, http.StatusMovedPermanently) //nolint:gosec // target is a same-site path from content or the request path
 }
 
-// serveHTML writes a pre-rendered page with this request's Hit id and header button swapped in.
-func serveHTML(w http.ResponseWriter, r *http.Request, res *content.Resource, hitID string, signedIn bool, status int) {
-	parts := res.Parts(hitID, signedIn)
+// serveHTML writes a pre-rendered page with this request's Hit id and header button swapped in. The
+// test-site bar and pill go only to people browsing; crawlers, agents and curl get the page without.
+func (h *Handler) serveHTML(w http.ResponseWriter, r *http.Request, res *content.Resource, hitID string, status int) {
+	signedIn := h.signedIn(r)
+	parts := res.Parts(hitID, signedIn, visits.Browsing(r.UserAgent(), r.Header.Get("Sec-Fetch-Dest")))
 	size := 0
 	for _, p := range parts {
 		size += len(p)
 	}
 	hd := w.Header()
 	hd.Set("Content-Type", res.ContentType)
+	hd.Add("Vary", "User-Agent, Sec-Fetch-Dest")
 	hd.Set("Cache-Control", "no-cache")
 	if signedIn {
 		hd.Set("Cache-Control", "private, no-cache")
@@ -98,7 +102,7 @@ func serveHTML(w http.ResponseWriter, r *http.Request, res *content.Resource, hi
 		return
 	}
 	for _, p := range parts {
-		_, _ = w.Write(p)
+		_, _ = w.Write(p) //nolint:gosec // pre-rendered page; the request only picks segments and a generated Hit id
 	}
 }
 

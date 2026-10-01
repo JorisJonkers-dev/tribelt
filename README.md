@@ -90,6 +90,11 @@ third-party requests, and a header button that reads "Inloggen" or, for a signed
   before the body paints, unless the visitor dismissed it (a flag in `localStorage`, else
   `sessionStorage`). Without JavaScript only the bar shows. Dismissals are not counted: the `/b`
   beacon carries a Hit id and engaged time, nothing else.
+- The bar, the pill and `notice.js` go only to people browsing (`visits.Browsing`): a browser
+  user-agent no bot rule claims, plus `Sec-Fetch-Dest: document`. curl, HTTP libraries, crawlers and
+  agents faking a browser user-agent get the page without them; the "mirror" tag in the header, the
+  footer note, JSON-LD, Markdown twins and `llms.txt` still say it is a student test site. The
+  template marks that markup with `__TRIBELT_HUMAN__` … `__TRIBELT_HUMAN_END__`.
 - Product pages get a split hero (photo, black panel with the category, H1 and an orange call to
   action), pill tabs, and the spec table beside a materials box. The footer's "For agents" column
   links `llms.txt`, the page's Markdown twin and the sitemap.

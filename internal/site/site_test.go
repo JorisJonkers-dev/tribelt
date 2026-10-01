@@ -22,6 +22,12 @@ import (
 
 const fixture = "../content/testdata/content"
 
+// browser is the request headers of a person loading a page in Chrome.
+var browser = map[string]string{
+	"User-Agent":     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+	"Sec-Fetch-Dest": "document",
+}
+
 func built(t *testing.T) *content.Built {
 	t.Helper()
 	c, err := content.Load(os.DirFS(fixture))
@@ -251,7 +257,7 @@ func TestHeaderButtonFollowsSession(t *testing.T) {
 // under their hashed URL, and briefly without it.
 func TestPageAssetsCacheForever(t *testing.T) {
 	b := built(t)
-	rec, _ := serve(&Handler{Built: b}, "GET", "/", nil)
+	rec, _ := serve(&Handler{Built: b}, "GET", "/", browser)
 	page := rec.Body.String()
 	assets := Assets(b)
 	for path, ctype := range map[string]string{"/static/notice.js": "text/javascript; charset=utf-8", "/static/site.css": "text/css; charset=utf-8"} {
@@ -264,6 +270,46 @@ func TestPageAssetsCacheForever(t *testing.T) {
 			assets.ServeHTTP(r, httptest.NewRequest("GET", target, nil))
 			if r.Code != 200 || r.Header().Get("Content-Type") != ctype || r.Header().Get("Cache-Control") != cache || r.Header().Get("ETag") == "" {
 				t.Fatalf("%s: %d %v", target, r.Code, r.Header())
+			}
+		}
+	}
+}
+
+// TestBannersOnlyForPeople: the test-site bar, the pill and its script go to a browser loading a page,
+// never to curl, crawlers or agents faking a browser user-agent without Sec-Fetch-Dest.
+func TestBannersOnlyForPeople(t *testing.T) {
+	h := &Handler{Built: built(t)}
+	chrome := browser["User-Agent"]
+	banners := []string{`<aside class="testbar"`, `<aside class="notice"`, `/static/notice.js`}
+	for _, c := range []struct {
+		name   string
+		header map[string]string
+		want   bool
+	}{
+		{"browser", browser, true},
+		{"curl", map[string]string{"User-Agent": "curl/8.7.1"}, false},
+		{"faked browser", map[string]string{"User-Agent": chrome}, false},
+		{"crawler", map[string]string{"User-Agent": "Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)", "Sec-Fetch-Dest": "document"}, false},
+	} {
+		for _, target := range []string{"/", "/bestaat-niet"} {
+			rec, _ := serve(h, "GET", target, c.header)
+			body := rec.Body.String()
+			for _, b := range banners {
+				if strings.Contains(body, b) != c.want {
+					t.Errorf("%s %s: has %s = %v, want %v", c.name, target, b, !c.want, c.want)
+				}
+			}
+			if strings.Contains(body, "__TRIBELT_") {
+				t.Errorf("%s %s: placeholder leaked", c.name, target)
+			}
+			if n, _ := strconv.Atoi(rec.Header().Get("Content-Length")); n != len(body) {
+				t.Errorf("%s %s: Content-Length %d, body %d", c.name, target, n, len(body))
+			}
+			if !strings.Contains(strings.Join(rec.Header().Values("Vary"), ","), "Sec-Fetch-Dest") {
+				t.Errorf("%s %s: Vary lacks the classifying headers", c.name, target)
+			}
+			if !strings.Contains(body, "mirror</span>") {
+				t.Errorf("%s %s: the header still marks the mirror", c.name, target)
 			}
 		}
 	}
