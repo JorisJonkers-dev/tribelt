@@ -137,7 +137,11 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	mux.Handle("GET /images/", assets)
 	mux.HandleFunc("POST /b", tracker.Beacon)
 	mux.HandleFunc("GET /go", tracker.Go(built.GoAllowed))
-	mux.Handle("/", tracker.Middleware(&site.Handler{Built: built}))
+	pages := &site.Handler{Built: built}
+	if statsOn {
+		pages.Viewer = func(r *http.Request) bool { _, ok := gate.Viewer(r); return ok }
+	}
+	mux.Handle("/", tracker.Middleware(pages))
 	searchOn := startSearchImport(ctx, cfg, store, logger)
 	if statsOn {
 		if err := mountStats(mux, gate, store, c, built, searchOn, logger); err != nil {

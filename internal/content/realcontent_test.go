@@ -1,10 +1,12 @@
 package content
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"regexp"
 	"slices"
@@ -14,6 +16,8 @@ import (
 	"testing"
 	"time"
 	"unicode"
+
+	"github.com/yuin/goldmark/ast"
 
 	"github.com/JorisJonkers-dev/tribelt/web"
 )
@@ -102,7 +106,8 @@ var (
 	robotsTag = regexp.MustCompile(`<meta name="robots" content="noindex`)
 )
 
-func html(r *Resource) string { return string(r.Head) + "HIT" + string(r.Tail) }
+// html is a page as a signed-out visitor receives it, with "HIT" as the Hit id.
+func html(r *Resource) string { return string(bytes.Join(r.Parts("HIT", false), nil)) }
 
 func ldTypes(t *testing.T, path, doc string) []string {
 	t.Helper()
@@ -181,7 +186,7 @@ func checkInternalHref(t *testing.T, c *Content, b *Built, from, href string) {
 	target, _, _ := strings.Cut(href, "#")
 	target, _, _ = strings.Cut(target, "?")
 	switch {
-	case strings.HasPrefix(href, "/go?"), target == "/stats":
+	case strings.HasPrefix(href, "/go?"), target == "/stats", target == "/auth/login":
 		return
 	case strings.HasPrefix(target, "/static/"), strings.HasPrefix(target, "/images/"):
 		if b.Assets[target] == nil {
@@ -325,6 +330,30 @@ func TestNoVerbatimCopy(t *testing.T) {
 	}
 }
 
+var testBar = regexp.MustCompile(`(?s)<aside class="testbar" aria-label="[^"]+">.*?<a href="(/go\?[^"]+)" rel="nofollow">`)
+
+// TestTestBarOnEveryPage: every page and 404 says it is a test site and links to its Official Page.
+func TestTestBarOnEveryPage(t *testing.T) {
+	c, b := loadReal(t)
+	check := func(name, doc, want string) {
+		t.Helper()
+		m := testBar.FindStringSubmatch(doc)
+		if m == nil {
+			t.Errorf("%s: no test-site bar with an official link", name)
+			return
+		}
+		if to := strings.ReplaceAll(m[1], "&amp;", "&"); !strings.Contains(to, "to="+url.QueryEscape(want)) {
+			t.Errorf("%s: bar links to %s, want %s", name, to, want)
+		}
+	}
+	for _, p := range c.Pages {
+		check(p.Path, html(b.HTML[p.Path]), p.Official)
+	}
+	for l, res := range b.NotFound {
+		check("404 "+l, html(res), c.Site.Official+c.Home(l).Path)
+	}
+}
+
 // The gates above must be able to fail: prove it on the fixture.
 func TestGatesCanFail(t *testing.T) {
 	c := loadFixture(t)
@@ -339,5 +368,42 @@ func TestGatesCanFail(t *testing.T) {
 	short := &Page{File: "y.md", Body: strings.Repeat("een twee drie vier vijf ", 4) + "zes"}
 	if got := verbatimFindings([]*Page{short}, official, VerbatimRun); len(got) != 0 {
 		t.Fatalf("24 shared words are allowed: %v", got)
+	}
+}
+
+var tags = regexp.MustCompile(`<[^>]*>`)
+
+// TestLayoutKeepsText: cards, bands and tabs only regroup a body; every word stays, in order.
+func TestLayoutKeepsText(t *testing.T) {
+	c, b := loadReal(t)
+	static, _ := fs.Sub(web.Static, "static")
+	bl := &builder{c: c, opts: Options{Static: static, Images: os.DirFS(realContent + "/images")}, assets: map[string]*Asset{}, images: map[string]imageInfo{}}
+	if err := bl.loadAssets(); err != nil {
+		t.Fatal(err)
+	}
+	md := markdown()
+	for _, p := range c.Pages {
+		plain, err := renderMarkdown(md, p.Body, p.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		shaped, err := renderWith(md, p.Body, p.Path, func(doc ast.Node, src []byte) { bl.layout(doc, src, p) })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a, z := strings.Join(words(tags.ReplaceAllString(plain, " ")), " "), strings.Join(words(tags.ReplaceAllString(shaped, " ")), " "); a != z {
+			t.Errorf("%s: layout changed the text", p.Path)
+		}
+	}
+	for path, want := range map[string]string{
+		"/transportbanden/draadogenbanden": `<div class="tabs"><section class="tab"><h2 id="specificaties"><a href="#specificaties">Specificaties</a></h2>`,
+		"/metalen-transportbanden":         `<div class="cards cards-product"><article class="card">`,
+		"/sectoren":                        `<div class="cards cards-sector"><article class="card">`,
+		"/":                                `<ul class="cards cards-product">`,
+		"/en/knowledge-center":             `<ul class="cards cards-post">`,
+	} {
+		if doc := html(b.HTML[path]); !strings.Contains(doc, want) {
+			t.Errorf("%s lacks %s", path, want)
+		}
 	}
 }

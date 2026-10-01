@@ -1,5 +1,6 @@
 # Build and test output
 bin/
+web/static/site.css
 coverage.out
 visits.out
 *.test
@@ -29,3 +30,4 @@ scratchpad/
 # Raw crawl pages stay local
 crawl/html/
 crawl/home/
+.task/

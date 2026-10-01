@@ -1,6 +1,7 @@
 package content
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -233,11 +234,25 @@ func TestBuildPage(t *testing.T) {
 		`<li><a href="/metalen-transportbanden">Metalen transportbanden</a></li>`,
 		`srcset="/images/product-480.webp 480w`,
 		`width="480" height="320"`,
-		`Studententestsite, niet de officiële site van Tribelt.`,
+		`<aside class="testbar" aria-label="studententestsite">`,
+		`Studieproject: dit is een testsite, niet de officiële website van Tribelt.`,
+		`<a class="btn btn-xl" href="/go?from=%2Ftransportbanden%2Fdraadogenbanden&amp;to=https%3A%2F%2Fwww.tribelt.nl%2Fcontact" rel="nofollow">`,
+		`href="/auth/login?next=/stats" rel="nofollow" aria-label="Inloggen"`,
+		`<link rel="preload" as="image" href="/images/product.webp" imagesrcset="/images/product-480.webp 480w`,
 	} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("page lacks %s", want)
 		}
+	}
+	if strings.Contains(doc, "Studententestsite, niet de officiële site van Tribelt.") {
+		t.Error("the footer note is replaced by the test-site bar")
+	}
+	signedIn := string(bytes.Join(res.Parts("HIT", true), nil))
+	if !strings.Contains(signedIn, `<a class="auth" href="/stats" rel="nofollow" aria-label="Statistieken">`) || strings.Contains(signedIn, "/auth/login") {
+		t.Error("a Stats Viewer gets the stats button")
+	}
+	if strings.Contains(doc, AuthPlaceholder) || strings.Contains(doc, HitPlaceholder) {
+		t.Error("placeholders are replaced")
 	}
 	var ld struct {
 		Graph []map[string]any `json:"@graph"`
@@ -356,6 +371,14 @@ func TestBuildErrors(t *testing.T) {
 		t.Fatalf("placeholder: %v", err)
 	}
 	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Hit}}{{end}}{{define "notfound"}}x{{end}}`)}}
+	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "auth placeholder") {
+		t.Fatalf("auth placeholder: %v", err)
+	}
+	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Hit}}{{.Auth}}{{end}}`)}}
+	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "authbutton") {
+		t.Fatalf("missing auth button template: %v", err)
+	}
+	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Hit}}{{.Auth}}{{end}}{{define "authbutton"}}b{{end}}{{define "notfound"}}x{{end}}`)}}
 	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Fatalf("404 placeholder: %v", err)
 	}
@@ -374,5 +397,40 @@ func TestBuildErrors(t *testing.T) {
 	opts.Static = fstest.MapFS{"x.css": {Data: []byte("a")}}
 	if _, err := Build(c, opts); err != nil {
 		t.Fatalf("static without site.css still builds: %v", err)
+	}
+}
+
+func TestDesignImages(t *testing.T) {
+	c := loadFixture(t)
+	opts := buildOpts(t, os.DirFS("testdata/content/images"))
+	webp, err := fs.ReadFile(os.DirFS("testdata/content/images"), "product.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := "- id: home\n  src: img/home.webp\n  alt: {nl: Hal, en: Hall, de: Halle}\n  credit: \"Foto: Tribelt\"\n"
+	static := fstest.MapFS{"site.css": {Data: []byte("a{}")}, "img/home.webp": {Data: webp}, "img/home-480.webp": {Data: webp}, "img/credits.yml": {Data: []byte(entry)}}
+	opts.Static = static
+	b, err := Build(c, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	en := html(b.HTML["/en"])
+	for _, want := range []string{`<img class="hero-img" src="/static/img/home.webp" srcset="/static/img/home-480.webp 480w, /static/img/home.webp 480w"`, `alt="Hall"`} {
+		if !strings.Contains(en, want) {
+			t.Errorf("design hero lacks %s", want)
+		}
+	}
+	if b.Assets["/static/img/credits.yml"] != nil {
+		t.Error("the credits list is not served")
+	}
+	for name, yml := range map[string]string{
+		"missing file": strings.Replace(entry, "img/home.webp", "img/nope.webp", 1),
+		"missing alt":  strings.Replace(entry, "de: Halle", "de: \"\"", 1),
+		"unknown key":  entry + "  nope: x\n",
+	} {
+		static["img/credits.yml"] = &fstest.MapFile{Data: []byte(yml)}
+		if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "credits.yml") {
+			t.Errorf("%s: %v", name, err)
+		}
 	}
 }

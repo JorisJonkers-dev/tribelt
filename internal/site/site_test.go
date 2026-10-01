@@ -15,6 +15,8 @@ import (
 
 	"github.com/JorisJonkers-dev/tribelt/internal/content"
 	"github.com/JorisJonkers-dev/tribelt/internal/hits"
+	"github.com/JorisJonkers-dev/tribelt/internal/platform/oidc"
+	"github.com/JorisJonkers-dev/tribelt/internal/platform/session"
 	"github.com/JorisJonkers-dev/tribelt/web"
 )
 
@@ -183,5 +185,64 @@ func TestAssets(t *testing.T) {
 func TestInfoWithoutMiddleware(t *testing.T) {
 	if hits.InfoFrom(context.Background()) == nil {
 		t.Fatal("InfoFrom never returns nil")
+	}
+}
+
+// TestHeaderButtonFollowsSession: one pre-rendered page, with the header button chosen per request
+// from the stats session cookie, sealed and opened as the OIDC gate does.
+func TestHeaderButtonFollowsSession(t *testing.T) {
+	codec, err := session.NewCodec(strings.Repeat("k", 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewer := func(r *http.Request) bool {
+		c, err := r.Cookie(oidc.SessionCookie)
+		var v oidc.Viewer
+		return err == nil && codec.Open(oidc.SessionCookie, c.Value, time.Now(), &v) == nil
+	}
+	valid, err := codec.Seal(oidc.SessionCookie, oidc.Viewer{Sub: "u1", Name: "Viewer"}, time.Now(), time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired, _ := codec.Seal(oidc.SessionCookie, oidc.Viewer{Sub: "u1"}, time.Now().Add(-2*time.Hour), time.Hour)
+	h := &Handler{Built: built(t), Viewer: viewer}
+	const (
+		signIn = `<a class="auth" href="/auth/login?next=/stats" rel="nofollow" aria-label="Inloggen">`
+		stats  = `<a class="auth" href="/stats" rel="nofollow" aria-label="Statistieken">`
+	)
+	for _, tc := range []struct {
+		name, cookie, want, cache string
+	}{
+		{"signed out", "", signIn, "no-cache"},
+		{"signed in", valid, stats, "private, no-cache"},
+		{"tampered cookie", valid[:len(valid)-2] + "xx", signIn, "no-cache"},
+		{"expired cookie", expired, signIn, "no-cache"},
+		{"garbage cookie", "not-a-session", signIn, "no-cache"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			header := map[string]string{}
+			if tc.cookie != "" {
+				header["Cookie"] = oidc.SessionCookie + "=" + tc.cookie
+			}
+			rec, info := serve(h, "GET", "/transportbanden/draadogenbanden", header)
+			body := rec.Body.String()
+			if !strings.Contains(body, tc.want) || strings.Count(body, `class="auth"`) != 1 {
+				t.Fatalf("want exactly %s", tc.want)
+			}
+			if strings.Contains(body, content.AuthPlaceholder) || !strings.Contains(body, `data-hit="`+info.HitID.String()+`"`) {
+				t.Fatal("both placeholders are filled")
+			}
+			if rec.Header().Get("Cache-Control") != tc.cache || rec.Header().Get("Content-Length") != strconv.Itoa(rec.Body.Len()) {
+				t.Fatalf("headers %v", rec.Header())
+			}
+		})
+	}
+	nf, _ := serve(h, "GET", "/en/missing", map[string]string{"Cookie": oidc.SessionCookie + "=" + valid})
+	if nf.Code != http.StatusNotFound || !strings.Contains(nf.Body.String(), `aria-label="Stats"`) {
+		t.Fatal("the 404 page swaps the button too")
+	}
+	plain, _ := serve(&Handler{Built: h.Built}, "GET", "/", map[string]string{"Cookie": oidc.SessionCookie + "=" + valid})
+	if !strings.Contains(plain.Body.String(), `aria-label="Inloggen"`) {
+		t.Fatal("without a gate every visitor is signed out")
 	}
 }

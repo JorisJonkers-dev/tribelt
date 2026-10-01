@@ -14,6 +14,8 @@ import (
 // Handler serves everything in a content.Built.
 type Handler struct {
 	Built *content.Built
+	// Viewer reports a signed-in Stats Viewer, whose header button then links to /stats; nil means never.
+	Viewer func(r *http.Request) bool
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,11 +61,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.serveText(w, r, h.Built.Markdown[p])
 			return
 		}
-		serveHTML(w, r, res, info.HitID.String(), http.StatusOK)
+		serveHTML(w, r, res, info.HitID.String(), h.signedIn(r), http.StatusOK)
 		return
 	}
-	serveHTML(w, r, h.Built.NotFound[info.Locale], info.HitID.String(), http.StatusNotFound)
+	serveHTML(w, r, h.Built.NotFound[info.Locale], info.HitID.String(), h.signedIn(r), http.StatusNotFound)
 }
+
+func (h *Handler) signedIn(r *http.Request) bool { return h.Viewer != nil && h.Viewer(r) }
 
 func redirect(w http.ResponseWriter, r *http.Request, to string) {
 	if r.URL.RawQuery != "" {
@@ -72,11 +76,20 @@ func redirect(w http.ResponseWriter, r *http.Request, to string) {
 	http.Redirect(w, r, to, http.StatusMovedPermanently) //nolint:gosec // target is a same-site path from content or the request path
 }
 
-func serveHTML(w http.ResponseWriter, r *http.Request, res *content.Resource, hitID string, status int) {
+// serveHTML writes a pre-rendered page with this request's Hit id and header button swapped in.
+func serveHTML(w http.ResponseWriter, r *http.Request, res *content.Resource, hitID string, signedIn bool, status int) {
+	parts := res.Parts(hitID, signedIn)
+	size := 0
+	for _, p := range parts {
+		size += len(p)
+	}
 	hd := w.Header()
 	hd.Set("Content-Type", res.ContentType)
 	hd.Set("Cache-Control", "no-cache")
-	hd.Set("Content-Length", strconv.Itoa(len(res.Head)+len(hitID)+len(res.Tail)))
+	if signedIn {
+		hd.Set("Cache-Control", "private, no-cache")
+	}
+	hd.Set("Content-Length", strconv.Itoa(size))
 	if status == http.StatusNotFound {
 		hd.Set("X-Robots-Tag", "noindex")
 	}
@@ -84,9 +97,9 @@ func serveHTML(w http.ResponseWriter, r *http.Request, res *content.Resource, hi
 	if r.Method == http.MethodHead {
 		return
 	}
-	_, _ = w.Write(res.Head)
-	_, _ = w.Write([]byte(hitID))
-	_, _ = w.Write(res.Tail)
+	for _, p := range parts {
+		_, _ = w.Write(p)
+	}
 }
 
 func (h *Handler) serveText(w http.ResponseWriter, r *http.Request, res *content.Resource) {

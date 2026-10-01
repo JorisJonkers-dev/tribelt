@@ -9,13 +9,16 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 func markdown() goldmark.Markdown {
 	return goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
+		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(boxRenderer{}, 900))),
 	)
 }
 
@@ -26,8 +29,16 @@ func GoLink(to, from string) string {
 
 // renderMarkdown renders a Markdown body to HTML, routing tribelt.nl links through /go.
 func renderMarkdown(md goldmark.Markdown, src, fromPath string) (string, error) {
+	return renderWith(md, src, fromPath, nil)
+}
+
+// renderWith renders like renderMarkdown, letting reshape adjust the parsed document first.
+func renderWith(md goldmark.Markdown, src, fromPath string, reshape func(ast.Node, []byte)) (string, error) {
 	source := []byte(src)
 	doc := md.Parser().Parse(text.NewReader(source))
+	if reshape != nil {
+		reshape(doc, source)
+	}
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if l, ok := n.(*ast.Link); ok && entering && isOfficialURL(string(l.Destination)) {
 			l.Destination = []byte(GoLink(string(l.Destination), fromPath))
