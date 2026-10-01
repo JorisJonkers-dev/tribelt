@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.2.0...v0.3.0) (2026-10-01)
+
+
+### Features
+
+* **site:** design pass, dismissible notice pill and a release-PR Content Release gate ([#7](https://github.com/JorisJonkers-dev/tribelt/issues/7)) ([24898cd](https://github.com/JorisJonkers-dev/tribelt/commit/24898cd2e2c3ecea256ea00d255b268849dc9286))
+
 ## [0.2.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.1.0...v0.2.0) (2026-10-01)
 
 
