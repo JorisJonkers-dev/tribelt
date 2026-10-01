@@ -10,11 +10,13 @@ One Go binary serves everything:
 - **Mirror Pages** (NL/EN/DE, the official paths and 301s), Markdown twins (`<path>.md` or
   `Accept: text/markdown`), `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`. All of it is
   rendered once at startup from `content/`, which is embedded in the binary.
-- **Hits** for every public request, classified by Visitor Kind, Verified Crawler and Arrival Channel,
-  written asynchronously to Postgres (a page never waits on the database). `/b` is the beacon,
-  `/go` records an Outbound Click and redirects to tribelt.nl.
-- **`/stats`** for Stats Viewers (OIDC against auth-api): Overview, Per page, Release compare,
-  AI & crawlers; CSV/SVG/PNG exports and an anonymised SQLite download.
+- **Hits** for every public request and content image, classified by Visitor Kind, Verified Crawler,
+  Arrival Channel and Resource, stamped with the Content Release and App Version, and written
+  asynchronously to Postgres (a page never waits on the database). `/b` is the beacon, `/go` records
+  an Outbound Click and redirects to tribelt.nl.
+- **`/stats`** for Stats Viewers (OIDC against auth-api): Overview, Pages (and page detail), Releases
+  (compare two Content Releases), AI & crawlers, Search; CSV/SVG/PNG exports and an anonymised
+  SQLite download.
 - A daily **Search Performance** import from Google Search Console and Bing Webmaster Tools, off
   when their credentials are empty.
 
@@ -42,7 +44,7 @@ task dev          # compose Postgres on :5433 + the site on :8080, stats open vi
 task check        # what CI runs: fmt, lint (golangci, squawk, actionlint), sqlc drift, vet,
                   # race tests (testcontainers Postgres), coverage gates, release gate, build, gitleaks
 task e2e          # Playwright: a page view's beacon confirms its Hit; a dismissed notice pill stays gone
-task css          # the public stylesheet: Tailwind standalone CLI, web/css -> web/static/site.css
+task css          # both stylesheets: Tailwind standalone CLI, web/css/{site,stats}.css -> web/static
 task gen          # sqlc after editing db/queries or db/migrations
 task update-ranges  # refresh the bundled crawler IP ranges
 ```
@@ -74,6 +76,11 @@ third-party requests, and a header button that reads "Inloggen" or, for a signed
   and `dev`) and the Dockerfile build it into the git-ignored `web/static/site.css`, which is embedded.
 - Fonts are self-hosted OFL substitutes for Tribelt's commercial faces: Outfit for Bw Gradual and
   Geist for Saans (`web/static/fonts`, licences alongside).
+- `/stats` has its own dark theme: `web/css/stats.css` builds into `web/static/stats.css` the same
+  way, set in self-hosted IBM Plex Sans and Mono (OFL). Charts are server-rendered SVG; the small
+  `web/static/chart.js` only swaps legend toggles in place and rasterises the SVG export to PNG, and
+  every control still works as a plain link or form without it (the CSP allows no inline script or
+  style, so bar widths and colours are SVG attributes).
 - `internal/content/layout.go` regroups a rendered body for presentation only: link lists and linked
   heading runs become cards, the home page gets coloured bands, product pages get CSS-only tabs. A
   test proves every word of the body survives in order.
@@ -116,7 +123,10 @@ fails the build instead of silently disappearing.
 `release` in `content/site.yml` must carry a label the previous release did not:
 
 ```yaml
-release: { label: v2-longtail-keywords, note: "Product titles lead with the long-tail term" }
+release:
+  label: v2-longtail-keywords
+  note: "Product titles lead with the long-tail term"
+  tags: [longtail-keywords, faq-schema]   # optional experiment labels, lowercase slugs
 ```
 
 The label is a lowercase slug. Several content PRs may share one label within a release, so a
@@ -126,9 +136,14 @@ label still equals the latest `vX.Y.Z` tag's. The release PR is where it is enfo
 anything under `content/` changed since the latest `vX.Y.Z` tag and the label did not. The fix is
 a label bump on `main`: release-please (`always-update`) then rebuilds its PR and CI runs again.
 Releases without content changes, and the first release, pass. The running release is recorded at
-startup, stamped on every Hit, drawn as a marker on every timeline and compared in *Release
-compare*. Sitemap `lastmod` is the date a page's current text first went live, so unchanged pages
+startup, stamped on every Hit, drawn as a marker on every timeline and compared in
+*Releases*. Sitemap `lastmod` is the date a page's current text first went live, so unchanged pages
 keep their date.
+
+Every Hit, Outbound Click and release row also records the **App Version**: the binary reads
+`.release-please-manifest.json` through `go:embed` (no build argument needed), logs it at startup
+and shows it in the stats header pill as `v0.3.0 · v2-longtail-keywords`. Releases, version and tag
+are all filters on every stats view.
 
 ## Environment
 

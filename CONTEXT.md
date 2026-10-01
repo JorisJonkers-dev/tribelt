@@ -32,11 +32,27 @@ new human label (e.g. `v3-longtail-keywords`) and a note on what changed.
 Stats compare releases.
 _Avoid_: version, deploy, build
 
+**Release Tag**:
+An optional free-form experiment label on a Content Release (e.g.
+`faq-schema`), so releases testing the same idea can be filtered together.
+
+**App Version**:
+The release-please version of the running binary (e.g. `0.3.0`), embedded at
+build time from `.release-please-manifest.json`. Stamped on every Hit, Outbound
+Click and Content Release next to the release label; one App Version can serve
+several Content Releases and one Content Release several App Versions.
+_Avoid_: build, deploy
+
 ### Visits
 
 **Hit**:
-One recorded request for a Mirror Page or agent-facing file, stored without
-raw IP.
+One recorded request for a Mirror Page, agent-facing file or content image,
+stored without raw IP.
+
+**Resource**:
+What a Hit fetched: `page`, `markdown`, `robots`, `llms`, `llms_full`,
+`sitemap`, `image`, `redirect` or `not_found`. Outbound Clicks report as
+`outbound`; the beacon and static assets are never Hits.
 _Avoid_: pageview, event, request
 
 **Visitor Kind**:
@@ -101,6 +117,8 @@ An auth-api admin, or a person holding the Tribelt stats service permission.
 ## Relationships
 
 - A **Hit** belongs to exactly one **Mirror Page** (or agent-facing file) and one **Content Release**
+- A **Hit** records exactly one **App Version** and one **Resource**
+- A **Content Release** has zero or more **Release Tags** and one or more **App Versions**
 - A **Hit** has exactly one **Visitor Kind**
 - A **Hit** has an **Arrival Channel** only when its **Visitor Kind** is `human` or `human-unconfirmed`
 - A **Hit** belongs to a **Visitor** when the client holds a Visitor ID, otherwise to a **Daily Visitor**
@@ -109,4 +127,5 @@ An auth-api admin, or a person holding the Tribelt stats service permission.
 
 ## Flagged ambiguities
 
-- "version" meant both a site-wide state and a per-page revision; resolved: only **Content Release** exists.
+- "version" meant both a site-wide state and a per-page revision; resolved: only **Content Release** exists
+  for content. The binary's release-please number is the **App Version**, never "version" alone.
