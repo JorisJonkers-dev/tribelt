@@ -36,10 +36,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
       </a>
       <span class="hidden h-6 w-px bg-line sm:block" aria-hidden="true"></span>
-      <span class="flex items-center gap-2.5">
+      <a href="/stats/account" class="flex min-h-11 items-center gap-2.5 text-ink no-underline" aria-label="Your account: {{.Viewer}}">
         <span class="flex size-8 items-center justify-center rounded-full bg-avatar text-[13px] font-semibold" aria-hidden="true">{{.Initials}}</span>
         <span class="hidden text-[13px] font-medium sm:inline">{{.Viewer}}</span>
-      </span>
+      </a>
       <form method="post" action="/auth/logout" class="m-0">
         <button type="submit" class="min-h-9 cursor-pointer rounded-lg border border-strong bg-panel px-3 font-sans text-[13px] text-ink hover:border-muted">Sign out</button>
       </form>

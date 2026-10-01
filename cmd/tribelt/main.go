@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/JorisJonkers-dev/tribelt"
+	"github.com/JorisJonkers-dev/tribelt/internal/accounts"
 	"github.com/JorisJonkers-dev/tribelt/internal/content"
 	"github.com/JorisJonkers-dev/tribelt/internal/hits"
 	"github.com/JorisJonkers-dev/tribelt/internal/integrations"
@@ -127,7 +128,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	gate, statsOn, err := newGate(ctx, cfg, logger)
+	gate, statsOn, err := newGate(ctx, cfg, store, logger)
 	if err != nil {
 		return err
 	}
@@ -201,10 +202,15 @@ func mountStats(mux *http.ServeMux, gate oidc.Gate, store *pg.Store, c *content.
 		ViewerName: func(r *http.Request) string { v, _ := gate.Viewer(r); return v.Name },
 		CSS:        built.AssetURL("/static/stats.css"), ChartJS: built.AssetURL("/static/chart.js"),
 		Integrations: integ,
+		// Changes re-read the roles from auth-api first, so a revoked admin cannot act even for 15 s.
 		Actor: func(r *http.Request) integrations.Actor {
 			v, _ := gate.Viewer(r)
+			if r.Method == http.MethodPost {
+				v, _ = gate.Fresh(r)
+			}
 			return integrations.Actor{Sub: v.Sub, Name: v.Name, Admin: v.Admin}
 		},
+		Account: gate.Account,
 		Session: gate.Session,
 		CSRFKey: csrfKey(cfg.SessionKey),
 	}
@@ -246,23 +252,45 @@ func listen(ctx context.Context, cfg config.Config, h http.Handler, recorder *hi
 }
 
 // newGate picks OIDC, the development bypass, or no stats at all (enabled=false).
-func newGate(ctx context.Context, cfg config.Config, logger *slog.Logger) (gate oidc.Gate, enabled bool, err error) {
+func newGate(ctx context.Context, cfg config.Config, store *pg.Store, logger *slog.Logger) (gate oidc.Gate, enabled bool, err error) {
 	switch {
 	case cfg.OIDCConfigured():
 		codec, err := session.NewCodec(cfg.SessionKey)
 		if err != nil {
 			return nil, false, err
 		}
+		sealer, err := integrations.NewSealer(cfg.SessionKey)
+		if err != nil {
+			return nil, false, err
+		}
+		accts := &accounts.Store{Pool: store.Pool(), Sealer: sealer}
+		go pruneSessions(ctx, accts, logger)
 		a, err := oidc.New(ctx, oidc.Config{
 			Issuer: cfg.OIDCIssuer, ClientID: cfg.OIDCClientID, ClientSecret: cfg.OIDCClientSecret,
-			RedirectURL: cfg.OIDCRedirectURL, PostLogoutURL: cfg.BaseURL + "/",
-		}, codec, logger)
+			RedirectURL: cfg.OIDCRedirectURL,
+		}, codec, accts, logger)
 		return a, err == nil, err
 	case cfg.DevAuthBypass && !cfg.Production:
 		logger.Warn("DEV_AUTH_BYPASS=1: /stats is open to anyone who can reach this process")
 		return oidc.DevBypass{ReadOnly: cfg.DevAuthViewer}, true, nil
 	default:
 		return oidc.DevBypass{}, false, nil
+	}
+}
+
+// pruneSessions deletes expired tribelt sessions every hour.
+func pruneSessions(ctx context.Context, s *accounts.Store, logger *slog.Logger) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		if err := s.Prune(ctx); err != nil && ctx.Err() == nil {
+			logger.Warn("prune expired sessions", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
 	}
 }
 

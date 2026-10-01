@@ -10,6 +10,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type Account struct {
+	ID             int64
+	Issuer         string
+	Sub            string
+	Name           string
+	Email          string
+	Roles          []string
+	Admin          bool
+	CreatedAt      time.Time
+	LastLoginAt    time.Time
+	RolesCheckedAt time.Time
+}
+
 type CloudflareDaily struct {
 	Host       string
 	Day        time.Time
@@ -142,4 +155,16 @@ type SearchPerformance struct {
 	Ctr         float64
 	Position    float64
 	ImportedAt  time.Time
+}
+
+type Session struct {
+	ID             string
+	AccountID      int64
+	RefreshToken   []byte
+	KeyID          string
+	UserAgent      string
+	CreatedAt      time.Time
+	LastSeenAt     time.Time
+	RolesCheckedAt time.Time
+	ExpiresAt      time.Time
 }

@@ -11,4 +11,4 @@ The Vault-delivered variables (`GSC_SERVICE_ACCOUNT_JSON`, `GSC_SITE_URL`, `BING
 - Rotating `SESSION_KEY` makes every saved credential unreadable: the key id no longer matches, the card shows an error asking to enter the credential again, and nothing is decrypted with the wrong key. Rotating without re-entry needs a one-off re-encryption (open with the old key, seal with the new) before the switch; the key id makes the rows to convert easy to find.
 - A database dump contains the sealed credentials but not the key, so the dump alone does not reveal them. Anyone holding both `SESSION_KEY` and the dump does.
 - `SESSION_KEY` now guards both the session cookie and the stored credentials. Without it (local development) the page still shows Vault-managed sources but cannot save anything.
-- Only `ROLE_ADMIN` may change an integration; that role is read from the ID token at sign-in and fixed for the 8-hour session, so a revoked admin keeps it until the session expires.
+- Only `ROLE_ADMIN` may change an integration. Since ADR-0006 the role is re-read from auth-api right before every change, so a revoked admin loses it at once.

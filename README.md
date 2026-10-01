@@ -156,7 +156,7 @@ are all filters on every stats view.
 | `BASE_URL` | public origin; https turns on Secure cookies and HSTS |
 | `TRIBELT_ENV` | `production` demands OIDC, `VISITOR_HMAC_KEY` and https, and refuses the bypass |
 | `OIDC_ISSUER` `OIDC_CLIENT_ID` `OIDC_CLIENT_SECRET` `OIDC_REDIRECT_URL` | stats sign-in (discovery, PKCE, state, nonce) |
-| `SESSION_KEY` | at least 32 characters; encrypts the `__Host-` session cookie and, through HKDF, the Integration credentials (ADR-0005) |
+| `SESSION_KEY` | at least 32 characters; seals the `__Host-` session cookie and, through HKDF, the Integration credentials and refresh tokens (ADR-0005, ADR-0006) |
 | `VISITOR_HMAC_KEY` | derives the daily Daily Visitor salt |
 | `GSC_SERVICE_ACCOUNT_JSON` `GSC_SITE_URL` | Search Console import "managed by Vault"; empty = unset; a credential saved in the UI wins |
 | `BING_API_KEY` `BING_SITE_URL` | Bing Webmaster import "managed by Vault"; empty = unset; a credential saved in the UI wins |
@@ -164,7 +164,11 @@ are all filters on every stats view.
 | `CONTENT_DIR` | read content from disk instead of the embedded copy |
 
 Stats access is granted at auth-api's authorize endpoint (service permission `TRIBELT`) and
-checked again here: the ID token's `roles` must contain `SERVICE_TRIBELT` or `ROLE_ADMIN`.
+checked again here: the token's `roles` must contain `SERVICE_TRIBELT` or `ROLE_ADMIN`.
+Signing in creates a local Account and a server-side Session (ADR-0006). tribelt re-reads the roles
+from auth-api with the session's refresh token at least every 15 seconds and right before any change,
+so a permission granted or removed in auth-api applies within seconds. Signing out ends the tribelt
+Session only; `/stats/account` lists your sessions and can end all of them.
 
 ## Integrations
 
