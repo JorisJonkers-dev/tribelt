@@ -1,8 +1,8 @@
 -- Every Hit records what it fetched (resource) and which build served it (app_version); every
--- Content Release records the app versions that served it and its experiment tags.
--- Backfill is best effort: v0.2.0 was tagged at 2026-10-01 09:47:24 UTC, so anything recorded
--- before that is attributed to 0.1.0 and anything after to 0.2.0 (the deploy lagged the tag by
--- minutes, so a handful of 0.1.0 Hits around the cutover may read 0.2.0).
+-- Content Release records the App Versions that served it and its experiment tags.
+-- The App Version backfill is best effort, by the release tags' commit times: before v0.2.0
+-- (2026-10-01 09:47:24 UTC) is 0.1.0, before v0.3.0 (10:47:07 UTC) is 0.2.0, later rows are 0.3.0.
+-- Each deploy lagged its tag by minutes, so a few Hits around a cutover may carry the newer version.
 
 -- +goose Up
 SET lock_timeout = '5s';
@@ -37,17 +37,31 @@ UPDATE hits SET resource = CASE
     ELSE 'page'
 END;
 
-UPDATE hits SET app_version = CASE WHEN ts < '2026-10-01 09:47:24+00' THEN '0.1.0' ELSE '0.2.0' END
+UPDATE hits SET app_version = CASE
+    WHEN ts < '2026-10-01 09:47:24+00' THEN '0.1.0'
+    WHEN ts < '2026-10-01 10:47:07+00' THEN '0.2.0'
+    ELSE '0.3.0'
+END
 WHERE app_version = '';
 
-UPDATE outbound_clicks SET app_version = CASE WHEN ts < '2026-10-01 09:47:24+00' THEN '0.1.0' ELSE '0.2.0' END
+UPDATE outbound_clicks SET app_version = CASE
+    WHEN ts < '2026-10-01 09:47:24+00' THEN '0.1.0'
+    WHEN ts < '2026-10-01 10:47:07+00' THEN '0.2.0'
+    ELSE '0.3.0'
+END
 WHERE app_version = '';
 
-UPDATE releases SET
-    app_version = CASE WHEN first_seen_at < '2026-10-01 09:47:24+00' THEN '0.1.0' ELSE '0.2.0' END,
-    app_versions = CASE
-        WHEN last_seen_at < '2026-10-01 09:47:24+00' THEN ARRAY['0.1.0']
-        WHEN first_seen_at < '2026-10-01 09:47:24+00' THEN ARRAY['0.1.0', '0.2.0']
-        ELSE ARRAY['0.2.0']
-    END
+-- A release was served by every version whose window overlaps its first and last sighting.
+UPDATE releases SET app_versions = ARRAY(
+    SELECT w.version
+    FROM (VALUES
+        ('0.1.0', '-infinity'::timestamptz, '2026-10-01 09:47:24+00'::timestamptz),
+        ('0.2.0', '2026-10-01 09:47:24+00'::timestamptz, '2026-10-01 10:47:07+00'::timestamptz),
+        ('0.3.0', '2026-10-01 10:47:07+00'::timestamptz, 'infinity'::timestamptz)
+    ) AS w (version, since, until)
+    WHERE releases.first_seen_at < w.until AND releases.last_seen_at >= w.since
+    ORDER BY w.since
+)
 WHERE app_version = '';
+
+UPDATE releases SET app_version = app_versions[1] WHERE app_version = '' AND cardinality(app_versions) > 0;

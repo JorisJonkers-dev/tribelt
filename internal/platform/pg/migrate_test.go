@@ -52,6 +52,7 @@ func TestResourceAndVersionBackfill(t *testing.T) {
 		`('00000000-0000-0000-0000-000000000007', '2026-10-01 10:00+00', '/transportbanden', NULL, 'v1-baseline', 'html', 301, 'search-crawler', 'ua', 'd')`,
 		`('00000000-0000-0000-0000-000000000008', '2026-10-01 10:00+00', '/wp-login.php', NULL, 'v1-baseline', 'html', 404, 'other-bot', 'ua', 'd')`,
 		`('00000000-0000-0000-0000-000000000009', '2026-10-01 10:00+00', '/nope.md', NULL, 'v1-baseline', 'html', 404, 'other-bot', 'ua', 'd')`,
+		`('00000000-0000-0000-0000-00000000000a', '2026-10-01 11:00+00', '/sectoren', 'sectoren', 'v1-baseline', 'html', 200, 'human', 'ua', 'd')`,
 	} {
 		exec(hit + row)
 	}
@@ -63,7 +64,7 @@ func TestResourceAndVersionBackfill(t *testing.T) {
 	}
 	want := map[string][2]string{
 		"1": {"page", "0.1.0"}, "2": {"markdown", "0.1.0"}, "3": {"robots", "0.2.0"}, "4": {"llms", "0.2.0"}, "5": {"llms_full", "0.2.0"},
-		"6": {"sitemap", "0.2.0"}, "7": {"redirect", "0.2.0"}, "8": {"not_found", "0.2.0"}, "9": {"not_found", "0.2.0"},
+		"6": {"sitemap", "0.2.0"}, "7": {"redirect", "0.2.0"}, "8": {"not_found", "0.2.0"}, "9": {"not_found", "0.2.0"}, "a": {"page", "0.3.0"},
 	}
 	rows, err := conn.QueryContext(ctx, `SELECT right(id::text, 1), resource, app_version FROM hits`)
 	if err != nil {
@@ -91,7 +92,7 @@ func TestResourceAndVersionBackfill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if clickVersion != "0.2.0" || v1 != "0.1.0" || v1All != "0.1.0,0.2.0" || v0All != "0.1.0" {
+	if clickVersion != "0.2.0" || v1 != "0.1.0" || v1All != "0.1.0,0.2.0,0.3.0" || v0All != "0.1.0" {
 		t.Fatalf("click %s, v1 %s %s, v0 %s", clickVersion, v1, v1All, v0All)
 	}
 	// The validated checks now refuse what the classifier never produces.
