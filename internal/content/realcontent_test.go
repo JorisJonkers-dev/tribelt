@@ -188,6 +188,8 @@ func checkInternalHref(t *testing.T, c *Content, b *Built, from, href string) {
 	switch {
 	case strings.HasPrefix(href, "/go?"), target == "/stats", target == "/auth/login":
 		return
+	case b.Files[target] != nil:
+		return
 	case strings.HasPrefix(target, "/static/"), strings.HasPrefix(target, "/images/"):
 		if b.Assets[target] == nil {
 			t.Errorf("%s: asset %s missing", from, href)
@@ -351,6 +353,47 @@ func TestTestBarOnEveryPage(t *testing.T) {
 	}
 	for l, res := range b.NotFound {
 		check("404 "+l, html(res), c.Site.Official+c.Home(l).Path)
+	}
+}
+
+var (
+	noticePill   = regexp.MustCompile(`(?s)<aside class="notice" aria-label="[^"]+">\s*<p>[^<]+<a href="(/go\?[^"]+)" rel="nofollow">[^<]+</a></p>\s*<button class="notice-close" type="button" data-notice-close aria-label="([^"]+)">`)
+	noticeScript = regexp.MustCompile(`(?s)<head>.*<script src="(/static/notice\.js\?v=[0-9a-f]+)"></script>.*</head>`)
+)
+
+// TestNoticeOnEveryPage: every page and 404 carries the dismissible pill, linking to its Official Page,
+// and loads the script that shows it from <head>, before the body paints.
+func TestNoticeOnEveryPage(t *testing.T) {
+	c, b := loadReal(t)
+	check := func(name, doc, want string) {
+		t.Helper()
+		m := noticePill.FindStringSubmatch(doc)
+		if m == nil {
+			t.Errorf("%s: no notice pill with an official link and a labelled close button", name)
+			return
+		}
+		if to := strings.ReplaceAll(m[1], "&amp;", "&"); !strings.Contains(to, "to="+url.QueryEscape(want)) {
+			t.Errorf("%s: pill links to %s, want %s", name, to, want)
+		}
+		s := noticeScript.FindStringSubmatch(doc)
+		if s == nil || b.Assets[strings.Split(s[1], "?")[0]] == nil {
+			t.Errorf("%s: notice script missing from <head>", name)
+		}
+	}
+	for _, p := range c.Pages {
+		check(p.Path, html(b.HTML[p.Path]), p.Official)
+	}
+	for l, res := range b.NotFound {
+		check("404 "+l, html(res), c.Site.Official+c.Home(l).Path)
+	}
+	labels := map[string]bool{}
+	for _, l := range LocaleOrder() {
+		if m := noticePill.FindStringSubmatch(html(b.NotFound[l])); m != nil {
+			labels[m[2]] = true
+		}
+	}
+	if len(labels) != len(LocaleOrder()) {
+		t.Errorf("close button label is not localized: %v", labels)
 	}
 }
 

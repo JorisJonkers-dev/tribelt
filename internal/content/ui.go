@@ -9,6 +9,10 @@ type UI struct {
 	SignIn, Stats, OpenMenu, CloseMenu, Utility string
 	HelpTitle, HelpLink                         string
 	ContactCol, SiteCol, Attribution            string
+	// NoticeText is the dismissible floating pill; it links to the Official Page like the bar.
+	NoticeLabel, NoticeText, NoticeClose string
+	AgentsCol, MarkdownLink, Sitemap     string
+	CTATitle, CTAText                    string
 }
 
 func uiStrings(locale string) UI {
@@ -26,6 +30,9 @@ func uiStrings(locale string) UI {
 			SignIn:   "Sign in", Stats: "Stats", OpenMenu: "Menu", CloseMenu: "Close menu", Utility: "More",
 			HelpTitle: "How can we help you?", HelpLink: "Contact Tribelt",
 			ContactCol: "Contact", SiteCol: "This test site", Attribution: "Content and photos: Tribelt B.V., used with permission",
+			NoticeLabel: "Notice", NoticeText: "This is a test site from a student project, not Tribelt's website.", NoticeClose: "Dismiss notice",
+			AgentsCol: "For agents", MarkdownLink: "Markdown version", Sitemap: "Sitemap",
+			CTATitle: "Advice or a quote?", CTAText: "Quotes and advice go through Tribelt's official website.",
 		}
 	case "de":
 		return UI{
@@ -40,6 +47,9 @@ func uiStrings(locale string) UI {
 			SignIn:   "Anmelden", Stats: "Statistiken", OpenMenu: "Menü", CloseMenu: "Menü schließen", Utility: "Mehr",
 			HelpTitle: "Wie können wir Ihnen helfen?", HelpLink: "Tribelt kontaktieren",
 			ContactCol: "Kontakt", SiteCol: "Diese Testseite", Attribution: "Inhalte und Fotos: Tribelt B.V., mit Erlaubnis verwendet",
+			NoticeLabel: "Hinweis", NoticeText: "Dies ist eine Testseite aus einem Studienprojekt, nicht die Website von Tribelt.", NoticeClose: "Hinweis schließen",
+			AgentsCol: "Für Agents", MarkdownLink: "Markdown-Version", Sitemap: "Sitemap",
+			CTATitle: "Beratung oder ein Angebot?", CTAText: "Angebote und Beratung laufen über die offizielle Website von Tribelt.",
 		}
 	default:
 		return UI{
@@ -54,6 +64,9 @@ func uiStrings(locale string) UI {
 			SignIn:   "Inloggen", Stats: "Statistieken", OpenMenu: "Menu", CloseMenu: "Menu sluiten", Utility: "Meer",
 			HelpTitle: "Waarmee kunnen we u helpen?", HelpLink: "Contact opnemen met Tribelt",
 			ContactCol: "Contact", SiteCol: "Deze testsite", Attribution: "Inhoud en foto's: Tribelt B.V., gebruikt met toestemming",
+			NoticeLabel: "Melding", NoticeText: "Dit is een testsite van een studentenproject, niet de website van Tribelt.", NoticeClose: "Melding sluiten",
+			AgentsCol: "Voor agents", MarkdownLink: "Markdown-versie", Sitemap: "Sitemap",
+			CTATitle: "Advies of een offerte?", CTAText: "Offertes en advies lopen via de officiële website van Tribelt.",
 		}
 	}
 }

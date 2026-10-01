@@ -35,6 +35,7 @@
 <link rel="preload" href="{{.}}" as="font" type="font/woff2" crossorigin>{{end}}
 {{- with .Hero}}
 <link rel="preload" as="image" href="{{.Src}}" {{.PreloadAttrs}} fetchpriority="high">{{end}}
+<script src="{{.Notice}}"></script>
 <link rel="stylesheet" href="{{.CSS}}">
 {{- if .JSONLD}}
 <script type="application/ld+json">{{.JSONLD}}</script>{{end}}
@@ -48,7 +49,7 @@
 </aside>
 <header class="site-header">
   <div class="hd">
-    <a class="brand" href="{{.HomeHref}}"><img src="{{.Logo}}" alt="{{.SiteName}}" width="150" height="50"></a>
+    <a class="brand" href="{{.HomeHref}}"><img src="{{.Logo}}" alt="{{.SiteName}}" width="150" height="50"><span class="brand-tag">mirror</span></a>
     <div class="menu" id="menu">
       <nav class="nav-main" aria-label="{{.UI.Menu}}">
         <ul>
@@ -80,13 +81,15 @@
     </div>
     <div class="hd-actions">
       {{.Auth}}
-      <a class="menu-btn" href="#menu" aria-controls="menu"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><circle cx="3" cy="8" r="1.6"/><circle cx="8" cy="3" r="1.6"/><circle cx="13" cy="8" r="1.6"/><circle cx="8" cy="13" r="1.6"/></svg>{{.UI.OpenMenu}}</a>
+      <a class="menu-btn" href="#menu" aria-controls="menu"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>{{.UI.OpenMenu}}</a>
     </div>
   </div>
 </header>
 {{end}}
 
-{{define "authbutton"}}<a class="auth" href="{{.Href}}" rel="nofollow" aria-label="{{.Label}}">{{if eq .Href "/stats"}}<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>{{else}}<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>{{end}}<span>{{.Label}}</span></a>{{end}}
+{{define "authbutton"}}<a class="auth" href="{{.Href}}" rel="nofollow" aria-label="{{.Label}}"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 19v-8M10 19V5M16 19v-5M21 19H3"/></svg><span>{{.Label}}</span></a>{{end}}
+
+{{define "arrow"}}<span class="pill-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"/></svg></span>{{end}}
 
 {{define "crumbs"}}{{if .Breadcrumbs}}
 <nav class="crumbs" aria-label="{{.UI.Breadcrumb}}">
@@ -114,6 +117,22 @@
   <div class="help-box help-hero">
     <p class="help-title">{{.Help.Title}}</p>
     <a class="btn btn-light" href="{{.Help.Href}}" rel="nofollow">{{.Help.Label}}</a>
+  </div>
+</section>
+{{- else if and .Hero (eq .Type "product")}}
+{{- if .Breadcrumbs}}
+<div class="crumbs-bar">{{template "crumbs" .}}</div>{{end}}
+<section class="hero hero-split">
+  <div class="hero-media">
+    {{template "heroimg" .Hero}}
+  </div>
+  <div class="hero-panel">
+    {{- with .Product}}{{if .Category}}
+    <p class="eyebrow">{{.Category}}</p>{{end}}{{end}}
+    <h1>{{.H1}}</h1>
+    <p class="hero-intro">{{.Description}}</p>
+    {{- if .CTA}}
+    <a class="btn-pill btn-pill-orange" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}{{template "arrow"}}</a>{{end}}
   </div>
 </section>
 {{- else if .Hero}}
@@ -174,23 +193,31 @@
           {{- end}}
         </ul>
       </nav>{{end}}
-      <div>
-        <p class="ft-h">{{.UI.SiteCol}}</p>
+      <nav aria-label="{{.UI.AgentsCol}}">
+        <p class="ft-h">{{.UI.AgentsCol}}</p>
         <ul>
-          <li><a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a></li>
-          <li><a href="{{.Footer.SiteURL}}">{{.Footer.SiteLabel}}</a></li>
+          <li><a href="/llms.txt" type="text/plain">llms.txt</a></li>
           {{- if .MarkdownURL}}
-          <li><a href="{{.MarkdownURL}}" type="text/markdown">Markdown</a></li>{{end}}
+          <li><a href="{{.MarkdownURL}}" type="text/markdown">{{.UI.MarkdownLink}}</a></li>{{end}}
+          <li><a href="/sitemap.xml" type="application/xml">{{.UI.Sitemap}}</a></li>
         </ul>
-      </div>
+      </nav>
     </div>
     <div class="ft-sub">
       <p>{{.UI.Attribution}}</p>
-      {{- if .Footer.PrivacyHref}}
-      <a href="{{.Footer.PrivacyHref}}">{{.Footer.PrivacyLabel}}</a>{{end}}
+      <ul aria-label="{{.UI.SiteCol}}">
+        <li><a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a></li>
+        <li><a href="{{.Footer.SiteURL}}">{{.Footer.SiteLabel}}</a></li>
+        {{- if .Footer.PrivacyHref}}
+        <li><a href="{{.Footer.PrivacyHref}}">{{.Footer.PrivacyLabel}}</a></li>{{end}}
+      </ul>
     </div>
   </div>
 </footer>
+<aside class="notice" aria-label="{{.UI.NoticeLabel}}">
+  <p>{{.UI.NoticeText}} <a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a></p>
+  <button class="notice-close" type="button" data-notice-close aria-label="{{.UI.NoticeClose}}"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+</aside>
 </body>
 </html>
 {{end}}
@@ -201,19 +228,28 @@
   <div class="body">{{.Body}}</div>
   {{- if .Product}}
   <section class="specs" aria-labelledby="specs-h">
-    <div class="wrap split">
+    <div class="wrap">
       <h2 id="specs-h" class="label">{{.UI.Specs}}</h2>
-      <table>
-        <caption>{{.Product.Name}}{{if .Product.Category}} · {{.Product.Category}}{{end}}</caption>
-        <tbody>
-          {{- range .Product.Specs}}
-          <tr><th scope="row">{{.Name}}</th><td>{{.Value}}{{if .Unit}} {{.Unit}}{{end}}</td></tr>
-          {{- end}}
-          {{- if .Product.Materials}}
-          <tr><th scope="row">{{$.UI.Materials}}</th><td>{{join .Product.Materials ", "}}</td></tr>
-          {{- end}}
-        </tbody>
-      </table>
+      <div class="specs-grid">
+        <table>
+          <caption>{{.Product.Name}}{{if .Product.Category}} · {{.Product.Category}}{{end}}</caption>
+          <tbody>
+            {{- range .Product.Specs}}
+            <tr><th scope="row">{{.Name}}</th><td>{{.Value}}{{if .Unit}} {{.Unit}}{{end}}</td></tr>
+            {{- end}}
+          </tbody>
+        </table>
+        {{- if .Product.Materials}}
+        <div class="materials">
+          <h3>{{$.UI.Materials}}</h3>
+          <ul>
+            {{- range .Product.Materials}}
+            <li>{{.}}</li>
+            {{- end}}
+          </ul>
+        </div>
+        {{- end}}
+      </div>
     </div>
   </section>
   {{- end}}
@@ -224,7 +260,7 @@
       <div class="faq-list">
         {{- range .FAQ}}
         <details>
-          <summary>{{.Q}}</summary>
+          <summary><span>{{.Q}}</span></summary>
           <div class="answer">{{.A}}</div>
         </details>
         {{- end}}
@@ -233,9 +269,13 @@
   </section>
   {{- end}}
   {{- if and .CTA (ne .Type "home")}}
-  <section class="cta-band">
+  <section class="cta-band" aria-labelledby="cta-h">
     <div class="wrap">
-      <a class="btn btn-xl" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a>
+      <div class="cta-text">
+        <h2 id="cta-h">{{.UI.CTATitle}}</h2>
+        <p>{{.UI.CTAText}}</p>
+      </div>
+      <a class="btn-pill btn-pill-dark" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}{{template "arrow"}}</a>
     </div>
   </section>
   {{- end}}

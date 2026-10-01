@@ -130,6 +130,6 @@ tasks:
     cmd: go run ./cmd/{{.APP}} serve
 
   e2e:
-    desc: Playwright beacon smoke test (starts Postgres and the built binary)
+    desc: Playwright beacon and notice-pill tests (starts Postgres and the built binary)
     deps: [db, build]
     cmd: scripts/e2e.sh

@@ -41,7 +41,7 @@ Tooling comes from [mise](https://mise.jdx.dev): `mise install` once, then every
 task dev          # compose Postgres on :5433 + the site on :8080, stats open via DEV_AUTH_BYPASS=1
 task check        # what CI runs: fmt, lint (golangci, squawk, actionlint), sqlc drift, vet,
                   # race tests (testcontainers Postgres), coverage gates, release gate, build, gitleaks
-task e2e          # Playwright: a real page view's beacon confirms its Hit
+task e2e          # Playwright: a page view's beacon confirms its Hit; a dismissed notice pill stays gone
 task css          # the public stylesheet: Tailwind standalone CLI, web/css -> web/static/site.css
 task gen          # sqlc after editing db/queries or db/migrations
 task update-ranges  # refresh the bundled crawler IP ranges
@@ -66,7 +66,7 @@ open http://localhost:8080/stats
 
 The public pages follow tribelt.nl's look (colours, layout rhythm, nav, heroes, cards, footer)
 with deliberate differences: a sticky bar on every page saying this is a student test site and
-linking to the Official Page, no forms (quote, contact and apply are tracked `/go` links), no
+linking to the Official Page, a floating notice pill saying the same, no forms (quote, contact and apply are tracked `/go` links), no
 third-party requests, and a header button that reads "Inloggen" or, for a signed-in Stats Viewer,
 "Statistieken" (swapped per request into the pre-rendered page).
 
@@ -77,6 +77,13 @@ third-party requests, and a header button that reads "Inloggen" or, for a signed
 - `internal/content/layout.go` regroups a rendered body for presentation only: link lists and linked
   heading runs become cards, the home page gets coloured bands, product pages get CSS-only tabs. A
   test proves every word of the body survives in order.
+- The notice pill needs JavaScript: `web/static/notice.js` loads in `<head>` and marks `<html>`
+  before the body paints, unless the visitor dismissed it (a flag in `localStorage`, else
+  `sessionStorage`). Without JavaScript only the bar shows. Dismissals are not counted: the `/b`
+  beacon carries a Hit id and engaged time, nothing else.
+- Product pages get a split hero (photo, black panel with the category, H1 and an orange call to
+  action), pill tabs, and the spec table beside a materials box. The footer's "For agents" column
+  links `llms.txt`, the page's Markdown twin and the sitemap.
 - Pictures for pages without a lead image live in `web/static/img`, credited in
   `web/static/img/credits.yml` with alt text per locale. They are design, not content, so adding one
   is not a Content Release.

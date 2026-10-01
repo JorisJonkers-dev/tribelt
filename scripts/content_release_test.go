@@ -48,7 +48,7 @@ func gitEnv() []string {
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test")
 }
 
-func (r *repo) git(args ...string) string {
+func (r *repo) git(args ...string) {
 	r.t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir, cmd.Env = r.dir, gitEnv()
@@ -56,7 +56,6 @@ func (r *repo) git(args ...string) string {
 	if err != nil {
 		r.t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
-	return strings.TrimSpace(string(out))
 }
 
 func (r *repo) write(name, body string) {

@@ -18,6 +18,7 @@ type pageView struct {
 	OGType, OGLocale, OGImage, OGImageAlt         string
 	OGAltLocales                                  []string
 	SiteName, HomeHref, CSS, Beacon, Hit, Auth    string
+	Notice                                        string
 	Logo, LogoFooter                              string
 	Fonts                                         []string
 	JSONLD                                        template.JS
@@ -88,7 +89,7 @@ func (b *builder) common(locale string) pageView {
 	l := b.c.Site.Locales[locale]
 	home := b.c.Home(locale)
 	v := pageView{
-		Lang: l.Hreflang, SiteName: b.c.Site.Org.Name, HomeHref: home.Path, CSS: b.css, Beacon: b.beacon, Hit: HitPlaceholder,
+		Lang: l.Hreflang, SiteName: b.c.Site.Org.Name, HomeHref: home.Path, CSS: b.css, Beacon: b.beacon, Notice: b.notice, Hit: HitPlaceholder,
 		Auth: AuthPlaceholder, Logo: b.versioned("/static/logo-header.svg"), LogoFooter: b.versioned("/static/logo-footer.svg"),
 		Fonts: b.fonts, UI: uiStrings(locale), OGType: "website", OGLocale: ogLocale(locale),
 		Footer: footerView{
