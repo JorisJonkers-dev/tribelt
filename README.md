@@ -42,6 +42,7 @@ task dev          # compose Postgres on :5433 + the site on :8080, stats open vi
 task check        # what CI runs: fmt, lint (golangci, squawk, actionlint), sqlc drift, vet,
                   # race tests (testcontainers Postgres), coverage gates, release gate, build, gitleaks
 task e2e          # Playwright: a real page view's beacon confirms its Hit
+task css          # the public stylesheet: Tailwind standalone CLI, web/css -> web/static/site.css
 task gen          # sqlc after editing db/queries or db/migrations
 task update-ranges  # refresh the bundled crawler IP ranges
 ```
@@ -60,6 +61,25 @@ curl -s -A 'Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)' \
      -H 'CF-Connecting-IP: 132.196.86.5' localhost:8080/sectoren >/dev/null   # a Verified Crawler Hit
 open http://localhost:8080/stats
 ```
+
+## Design
+
+The public pages follow tribelt.nl's look (colours, layout rhythm, nav, heroes, cards, footer)
+with deliberate differences: a sticky bar on every page saying this is a student test site and
+linking to the Official Page, no forms (quote, contact and apply are tracked `/go` links), no
+third-party requests, and a header button that reads "Inloggen" or, for a signed-in Stats Viewer,
+"Statistieken" (swapped per request into the pre-rendered page).
+
+- `web/css/site.css` is the Tailwind v4 source; `task css` (a dependency of `build`, `test`, `vet`
+  and `dev`) and the Dockerfile build it into the git-ignored `web/static/site.css`, which is embedded.
+- Fonts are self-hosted OFL substitutes for Tribelt's commercial faces: Outfit for Bw Gradual and
+  Geist for Saans (`web/static/fonts`, licences alongside).
+- `internal/content/layout.go` regroups a rendered body for presentation only: link lists and linked
+  heading runs become cards, the home page gets coloured bands, product pages get CSS-only tabs. A
+  test proves every word of the body survives in order.
+- Pictures for pages without a lead image live in `web/static/img`, credited in
+  `web/static/img/credits.yml` with alt text per locale. They are design, not content, so adding one
+  is not a Content Release.
 
 ## Editing content
 

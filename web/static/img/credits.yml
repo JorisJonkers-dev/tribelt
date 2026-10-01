@@ -1,0 +1,210 @@
+# Presentation imagery: pictures shown where a Mirror Page has no lead image of its own (hero, cards).
+# Every image is from the official Tribelt website (Webflow CDN), used with permission, re-encoded as webp
+# in 480, 960 and full (max 1600px) widths. Kept out of content/ because it is design, not a Content Release.
+- id: contact
+  src: img/contact.webp
+  variants: [img/contact-480.webp, img/contact-960.webp]
+  alt:
+    nl: "Twee lassers van Tribelt met lashelmen werken aan een metalen band in de fabriekshal"
+    en: "Two Tribelt welders in welding helmets working on a metal belt in the factory hall"
+    de: "Zwei Schweißer von Tribelt mit Schweißhelmen arbeiten in der Werkhalle an einem Metallband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68d53769f00a6ea58c2c3aba_BS_03640.avif
+- id: kenniscentrum
+  src: img/kenniscentrum.webp
+  variants: [img/kenniscentrum-480.webp, img/kenniscentrum-960.webp]
+  alt:
+    nl: "Handen in werkhandschoenen leggen een metalen transportband recht op de werkbank"
+    en: "Gloved hands straightening a metal conveyor belt on the workbench"
+    de: "Hände in Arbeitshandschuhen richten ein Metallförderband auf der Werkbank aus"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68d5376a2ce6826372a41d14_BS_03490.avif
+- id: nieuws
+  src: img/nieuws.webp
+  variants: [img/nieuws-480.webp, img/nieuws-960.webp]
+  alt:
+    nl: "Het bedrijfspand van De Spiraal en Tribelt aan de Metaalstraat in Haaksbergen"
+    en: "The De Spiraal and Tribelt building on Metaalstraat in Haaksbergen"
+    de: "Das Gebäude von De Spiraal und Tribelt an der Metaalstraat in Haaksbergen"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68bae9b46e9ab68afdb191d0_Foto%20pand-1-min.avif
+- id: nieuws--2024-een-bijzonder-jubileumjaar-voor-de-spiraal-en-tribelt
+  src: img/nieuws--2024-een-bijzonder-jubileumjaar-voor-de-spiraal-en-tribelt.webp
+  variants: [img/nieuws--2024-een-bijzonder-jubileumjaar-voor-de-spiraal-en-tribelt-480.webp, img/nieuws--2024-een-bijzonder-jubileumjaar-voor-de-spiraal-en-tribelt-960.webp]
+  alt:
+    nl: "Groepsfoto van de medewerkers van De Spiraal en Tribelt op het grasveld bij een boerderij met rieten dak"
+    en: "Group photo of De Spiraal and Tribelt staff on the lawn of a thatched farmhouse"
+    de: "Gruppenfoto der Mitarbeitenden von De Spiraal und Tribelt auf der Wiese vor einem reetgedeckten Hof"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192d0_IMG9635min.jpg
+- id: nieuws--de-spiraal-en-tribelt-ontvangen-studenten-mechanical-engineering-van-ut-en-vu
+  src: img/nieuws--de-spiraal-en-tribelt-ontvangen-studenten-mechanical-engineering-van-ut-en-vu.webp
+  variants: [img/nieuws--de-spiraal-en-tribelt-ontvangen-studenten-mechanical-engineering-van-ut-en-vu-480.webp, img/nieuws--de-spiraal-en-tribelt-ontvangen-studenten-mechanical-engineering-van-ut-en-vu-960.webp]
+  alt:
+    nl: "Groep studenten werktuigbouwkunde voor het oranje bedrijfspand van De Spiraal en Tribelt"
+    en: "Group of mechanical engineering students in front of the orange De Spiraal and Tribelt building"
+    de: "Gruppe von Maschinenbaustudierenden vor dem orangefarbenen Gebäude von De Spiraal und Tribelt"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192e0_IMG_9612-min.jpg
+- id: nieuws--pascal-12-5-jaar-in-dienst-bij-tribelt
+  src: img/nieuws--pascal-12-5-jaar-in-dienst-bij-tribelt.webp
+  variants: [img/nieuws--pascal-12-5-jaar-in-dienst-bij-tribelt-480.webp, img/nieuws--pascal-12-5-jaar-in-dienst-bij-tribelt-960.webp]
+  alt:
+    nl: "Pascal met een bos bloemen tussen twee collega's in een restaurant"
+    en: "Pascal holding a bouquet of flowers between two colleagues in a restaurant"
+    de: "Pascal mit einem Blumenstrauß zwischen zwei Kollegen in einem Restaurant"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192da_Pascal%2012%2C5.jpg
+- id: nieuws--rainer-12-5-jaar-in-dienst-bij-tribelt
+  src: img/nieuws--rainer-12-5-jaar-in-dienst-bij-tribelt.webp
+  variants: [img/nieuws--rainer-12-5-jaar-in-dienst-bij-tribelt-480.webp, img/nieuws--rainer-12-5-jaar-in-dienst-bij-tribelt-960.webp]
+  alt:
+    nl: "Rainer schudt de hand van een collega in een kantoor met oranje vlaggetjes"
+    en: "Rainer shaking hands with a colleague in an office decorated with orange bunting"
+    de: "Rainer schüttelt einem Kollegen in einem mit orangefarbenen Wimpeln geschmückten Büro die Hand"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192db_Rainer%201.jpg
+- id: nieuws--techniek-moet-je-doen-de-spiraal-en-tribelt-op-bezoek-bij-basisschool-los-hoes
+  src: img/nieuws--techniek-moet-je-doen-de-spiraal-en-tribelt-op-bezoek-bij-basisschool-los-hoes.webp
+  variants: [img/nieuws--techniek-moet-je-doen-de-spiraal-en-tribelt-op-bezoek-bij-basisschool-los-hoes-480.webp, img/nieuws--techniek-moet-je-doen-de-spiraal-en-tribelt-op-bezoek-bij-basisschool-los-hoes-960.webp]
+  alt:
+    nl: "Leerlingen van basisschool Los Hoes steken hun vinger op tijdens een techniekles in de klas"
+    en: "Pupils at Los Hoes primary school raising their hands during a technology lesson"
+    de: "Kinder der Grundschule Los Hoes melden sich während einer Technikstunde im Klassenzimmer"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192de_techniek%203.jpg
+- id: nieuws--terugblik-op-anuga-foodtec-2024-tribelt-kijkt-tevreden-terug-op-een-succesvolle-beurs
+  src: img/nieuws--terugblik-op-anuga-foodtec-2024-tribelt-kijkt-tevreden-terug-op-een-succesvolle-beurs.webp
+  variants: [img/nieuws--terugblik-op-anuga-foodtec-2024-tribelt-kijkt-tevreden-terug-op-een-succesvolle-beurs-480.webp, img/nieuws--terugblik-op-anuga-foodtec-2024-tribelt-kijkt-tevreden-terug-op-een-succesvolle-beurs-960.webp]
+  alt:
+    nl: "Oranje beursstand van Tribelt op Anuga FoodTec 2024"
+    en: "Tribelt's orange exhibition stand at Anuga FoodTec 2024"
+    de: "Orangefarbener Messestand von Tribelt auf der Anuga FoodTec 2024"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192d2_IMG_2186-min.jpg
+- id: nieuws--terugblik-op-iba-2025-tribelt-bv-bedankt-iedereen
+  src: img/nieuws--terugblik-op-iba-2025-tribelt-bv-bedankt-iedereen.webp
+  variants: [img/nieuws--terugblik-op-iba-2025-tribelt-bv-bedankt-iedereen-480.webp, img/nieuws--terugblik-op-iba-2025-tribelt-bv-bedankt-iedereen-960.webp]
+  alt:
+    nl: "Oranje beursstand van Tribelt op IBA 2025 met een vitrine vol transportbanden"
+    en: "Tribelt's orange stand at IBA 2025 with a display case of conveyor belts"
+    de: "Orangefarbener Stand von Tribelt auf der IBA 2025 mit einer Vitrine voller Förderbänder"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/68bae9b46e9ab68afdb192d6_IMG_5432-min.jpg
+- id: sectoren--aardappel-groente-en-fruit-agf
+  src: img/sectoren--aardappel-groente-en-fruit-agf.webp
+  variants: [img/sectoren--aardappel-groente-en-fruit-agf-480.webp, img/sectoren--aardappel-groente-en-fruit-agf-960.webp]
+  alt:
+    nl: "Aardappelen op een transportband in een waslijn van een verwerkingsbedrijf"
+    en: "Potatoes on a conveyor belt in a washing line at a processing plant"
+    de: "Kartoffeln auf einem Förderband in einer Waschstraße eines Verarbeitungsbetriebs"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a6819376ca58ba2180e06_68dbf50d40802023d2729f9a_AGF_converted.avif
+- id: sectoren--afvalverwerking
+  src: img/sectoren--afvalverwerking.webp
+  variants: [img/sectoren--afvalverwerking-480.webp, img/sectoren--afvalverwerking-960.webp]
+  alt:
+    nl: "Hellende transportband in een afvalverwerkingsinstallatie"
+    en: "Inclined conveyor belt in a waste processing installation"
+    de: "Steigendes Förderband in einer Abfallverarbeitungsanlage"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a682996bb2c7ac030bf26_68dbf4eb6eaf75ed2df6f1ca_afvalverwerking_converted.avif
+- id: sectoren--bakkerij--en-ovenbouwers
+  src: img/sectoren--bakkerij--en-ovenbouwers.webp
+  variants: [img/sectoren--bakkerij--en-ovenbouwers-480.webp, img/sectoren--bakkerij--en-ovenbouwers-960.webp]
+  alt:
+    nl: "Rijen gebakken broodjes op een metalen band die uit een industriële oven komen"
+    en: "Rows of baked rolls leaving an industrial oven on a metal belt"
+    de: "Reihen gebackener Brötchen verlassen auf einem Metallband einen Industrieofen"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a67fec59bb61f32d29da3_68dbf548e56ef4317706bf2e_ovenbouwers_converted.avif
+- id: sectoren--brood-banket
+  src: img/sectoren--brood-banket.webp
+  variants: [img/sectoren--brood-banket-480.webp, img/sectoren--brood-banket-960.webp]
+  alt:
+    nl: "Broden op een spiraalband in een bakkerijoven"
+    en: "Loaves of bread on a spiral belt in a bakery oven"
+    de: "Brotlaibe auf einem Spiralband in einem Backofen"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a682240d964195f5553d5_68dbf4fa3589cc3749d29466_Brood%20%26%20Banket_converted.avif
+- id: sectoren--productielijnen-procesinstallaties
+  src: img/sectoren--productielijnen-procesinstallaties.webp
+  variants: [img/sectoren--productielijnen-procesinstallaties-480.webp, img/sectoren--productielijnen-procesinstallaties-960.webp]
+  alt:
+    nl: "Transportband die door een blauwe procesinstallatie loopt"
+    en: "Conveyor belt running through a blue process installation"
+    de: "Förderband, das durch eine blaue Prozessanlage läuft"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a67f5dd2b8699347769a9_68dbf5517fe93ef62dd5289c_productielijnen_converted.avif
+- id: sectoren--recycling
+  src: img/sectoren--recycling.webp
+  variants: [img/sectoren--recycling-480.webp, img/sectoren--recycling-960.webp]
+  alt:
+    nl: "Recyclingmateriaal op brede transportbanden in een sorteerhal"
+    en: "Recycled material on wide conveyor belts in a sorting hall"
+    de: "Recyclingmaterial auf breiten Förderbändern in einer Sortierhalle"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a67d401389e5e73e9ced2_68dbf5654ce2f61ba31a7184_recycling_converted.avif
+- id: sectoren--systeemintegratoren-maatwerkoplossingen
+  src: img/sectoren--systeemintegratoren-maatwerkoplossingen.webp
+  variants: [img/sectoren--systeemintegratoren-maatwerkoplossingen-480.webp, img/sectoren--systeemintegratoren-maatwerkoplossingen-960.webp]
+  alt:
+    nl: "Blik in een ronde trommel met een metalen band en aandrijfas"
+    en: "View into a round drum with a metal belt and drive shaft"
+    de: "Blick in eine runde Trommel mit Metallband und Antriebswelle"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a6803c1ca9ee49905febf_68dbf55ab8aa92b574e524d4_maatwerkoplossingen_converted.avif
+- id: sectoren--vlees-vis-en-zuivel
+  src: img/sectoren--vlees-vis-en-zuivel.webp
+  variants: [img/sectoren--vlees-vis-en-zuivel-480.webp, img/sectoren--vlees-vis-en-zuivel-960.webp]
+  alt:
+    nl: "Garnalen op een roestvrijstalen transportband"
+    en: "Prawns on a stainless steel conveyor belt"
+    de: "Garnelen auf einem Edelstahlförderband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a6812e8ef0f26c9411d0f_68dbf51b4c8c73633744f524_Vlees%20vis%20zuivel_converted.avif
+- id: sectoren--vleesvervangers
+  src: img/sectoren--vleesvervangers.webp
+  variants: [img/sectoren--vleesvervangers-480.webp, img/sectoren--vleesvervangers-960.webp]
+  alt:
+    nl: "Stukken vleesvervanger op een opgaande metalen transportband"
+    en: "Pieces of meat substitute on an inclined metal conveyor belt"
+    de: "Stücke Fleischersatz auf einem steigenden Metallförderband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a9a680bcc3dbeea833d1046_68dbf53a2dd5e0cdb377473b_vleesvervangers_converted.avif
+- id: vacatures--open-sollicitatie
+  src: img/vacatures--open-sollicitatie.webp
+  variants: [img/vacatures--open-sollicitatie-480.webp, img/vacatures--open-sollicitatie-960.webp]
+  alt:
+    nl: "Twee lassers van Tribelt met lashelmen aan het werk"
+    en: "Two Tribelt welders at work in welding helmets"
+    de: "Zwei Schweißer von Tribelt mit Schweißhelmen bei der Arbeit"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a54c1c2149f96f526248bf6_BS_03683.jpg
+- id: vacatures--productiemedewerker-kantafwerking
+  src: img/vacatures--productiemedewerker-kantafwerking.webp
+  variants: [img/vacatures--productiemedewerker-kantafwerking-480.webp, img/vacatures--productiemedewerker-kantafwerking-960.webp]
+  alt:
+    nl: "Productiemedewerker met lashelm achter een rol metalen band"
+    en: "Production worker in a welding helmet behind a roll of metal belt"
+    de: "Produktionsmitarbeiter mit Schweißhelm hinter einer Rolle Metallband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19188/6a69a17915bb75bfa8a70c8b_BS_03355_converted.avif
+- id: veelgestelde-vragen
+  src: img/veelgestelde-vragen.webp
+  variants: [img/veelgestelde-vragen-480.webp, img/veelgestelde-vragen-960.webp]
+  alt:
+    nl: "Twee medewerkers van Tribelt bekijken samen een tekening op de werkbank"
+    en: "Two Tribelt employees studying a drawing together at the workbench"
+    de: "Zwei Mitarbeiter von Tribelt betrachten gemeinsam eine Zeichnung an der Werkbank"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68d537541153a3e349d1c93e_BS_03455.avif
+- id: werken-bij-tribelt
+  src: img/werken-bij-tribelt.webp
+  variants: [img/werken-bij-tribelt-480.webp, img/werken-bij-tribelt-960.webp]
+  alt:
+    nl: "Medewerker met lasmasker werkt aan een metalen transportband in de fabriek"
+    en: "Employee in a welding mask working on a metal conveyor belt in the factory"
+    de: "Mitarbeiter mit Schweißmaske arbeitet in der Fabrik an einem Metallförderband"
+  credit: "Foto: Tribelt"
+  source: https://cdn.prod.website-files.com/68bae9b46e9ab68afdb19172/68d537665476ff3d57d6b519_BS_03582.avif

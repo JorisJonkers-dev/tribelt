@@ -272,7 +272,10 @@ func (DevBypass) Viewer(r *http.Request) (Viewer, bool) {
 // Require lets everything through.
 func (DevBypass) Require(next http.Handler) http.Handler { return next }
 
-// Routes mounts a logout that simply returns home.
+// Routes mounts a login that goes straight to the stats and a logout that returns home.
 func (DevBypass) Routes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /auth/login", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, safeNext(r.URL.Query().Get("next")), http.StatusFound) //nolint:gosec // safeNext only returns /stats paths
+	})
 	mux.HandleFunc("POST /auth/logout", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusSeeOther) })
 }

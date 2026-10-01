@@ -18,6 +18,9 @@ import (
 // HitPlaceholder marks where the per-request Hit id goes in pre-rendered HTML.
 const HitPlaceholder = "__TRIBELT_HIT__"
 
+// AuthPlaceholder marks where the per-request sign-in or stats button goes in pre-rendered HTML.
+const AuthPlaceholder = "__TRIBELT_AUTH__"
+
 // Resource is one pre-rendered public response.
 type Resource struct {
 	Path        string
@@ -25,10 +28,21 @@ type Resource struct {
 	Locale      string
 	Format      string // html | md | txt | xml
 	ContentType string
-	// Body is the whole response; for HTML it is split around the Hit placeholder into Head and Tail.
-	Body       []byte
-	Head, Tail []byte
-	ETag       string
+	// Body is the whole response; for HTML it is split around the Hit and auth placeholders into
+	// Head, Mid and Tail, with the two prepared buttons for the auth slot.
+	Body                []byte
+	Head, Mid, Tail     []byte
+	SignedOut, SignedIn []byte
+	ETag                string
+}
+
+// Parts are the pieces of an HTML response: the page with this request's Hit id and header button.
+func (r *Resource) Parts(hit string, signedIn bool) [][]byte {
+	button := r.SignedOut
+	if signedIn {
+		button = r.SignedIn
+	}
+	return [][]byte{r.Head, []byte(hit), r.Mid, button, r.Tail}
 }
 
 // Asset is a static file served with a long cache lifetime.
@@ -68,6 +82,8 @@ type builder struct {
 	tmpl   *template.Template
 	assets map[string]*Asset
 	images map[string]imageInfo
+	design map[string]designImage
+	fonts  []string
 	css    string
 	beacon string
 }
@@ -132,11 +148,37 @@ func (b *builder) html(name string, view any, p, id, locale string) (*Resource, 
 	if err := b.tmpl.ExecuteTemplate(&buf, name, view); err != nil {
 		return nil, err
 	}
-	head, tail, ok := bytes.Cut(buf.Bytes(), []byte(HitPlaceholder))
+	head, rest, ok := bytes.Cut(buf.Bytes(), []byte(HitPlaceholder))
 	if !ok {
 		return nil, fmt.Errorf("template %s lacks the hit placeholder", name)
 	}
-	return &Resource{Path: p, PageID: id, Locale: locale, Format: "html", ContentType: "text/html; charset=utf-8", Head: head, Tail: tail}, nil
+	mid, tail, ok := bytes.Cut(rest, []byte(AuthPlaceholder))
+	if !ok {
+		return nil, fmt.Errorf("template %s lacks the auth placeholder", name)
+	}
+	out, in, err := b.authButtons(locale)
+	if err != nil {
+		return nil, err
+	}
+	return &Resource{
+		Path: p, PageID: id, Locale: locale, Format: "html", ContentType: "text/html; charset=utf-8",
+		Head: head, Mid: mid, Tail: tail, SignedOut: out, SignedIn: in,
+	}, nil
+}
+
+// authButton is the header link that becomes "Stats" for a signed-in Stats Viewer.
+type authButton struct{ Href, Label string }
+
+func (b *builder) authButtons(locale string) (signedOut, signedIn []byte, err error) {
+	ui := uiStrings(locale)
+	var out, in bytes.Buffer
+	if err := b.tmpl.ExecuteTemplate(&out, "authbutton", authButton{Href: "/auth/login?next=/stats", Label: ui.SignIn}); err != nil {
+		return nil, nil, err
+	}
+	if err := b.tmpl.ExecuteTemplate(&in, "authbutton", authButton{Href: "/stats", Label: ui.Stats}); err != nil {
+		return nil, nil, err
+	}
+	return out.Bytes(), in.Bytes(), nil
 }
 
 func (b *builder) loadAssets() error {
@@ -144,11 +186,14 @@ func (b *builder) loadAssets() error {
 		if err != nil || d.IsDir() {
 			return err
 		}
+		if path.Ext(p) == ".yml" {
+			return nil
+		}
 		raw, err := fs.ReadFile(b.opts.Static, p)
 		if err != nil {
 			return err
 		}
-		b.assets["/static/"+strings.TrimPrefix(p, "static/")] = newAsset(p, raw)
+		b.addAsset("/static/"+strings.TrimPrefix(p, "static/"), raw)
 		return nil
 	})
 	if err != nil {
@@ -164,16 +209,41 @@ func (b *builder) loadAssets() error {
 		if err != nil {
 			return fmt.Errorf("content: image %s: %w", name, err)
 		}
-		b.assets["/images/"+name] = newAsset(name, raw)
-		if strings.HasSuffix(name, ".webp") {
-			if cfg, err := webp.DecodeConfig(bytes.NewReader(raw)); err == nil {
-				b.images[name] = imageInfo{cfg.Width, cfg.Height}
-			}
-		}
+		b.addAsset("/images/"+name, raw)
 	}
+	b.versionCSSURLs("/static/site.css")
 	b.css = b.versioned("/static/site.css")
 	b.beacon = b.versioned("/static/beacon.js")
-	return nil
+	for _, f := range []string{"/static/fonts/outfit.woff2", "/static/fonts/geist-500.woff2"} {
+		if b.assets[f] != nil {
+			b.fonts = append(b.fonts, b.versioned(f))
+		}
+	}
+	return b.loadDesign()
+}
+
+func (b *builder) addAsset(p string, raw []byte) {
+	b.assets[p] = newAsset(p, raw)
+	if strings.HasSuffix(p, ".webp") {
+		if cfg, err := webp.DecodeConfig(bytes.NewReader(raw)); err == nil {
+			b.images[p] = imageInfo{cfg.Width, cfg.Height}
+		}
+	}
+}
+
+// versionCSSURLs points a stylesheet's url(/static/...) references at their cache-busting URLs.
+func (b *builder) versionCSSURLs(css string) {
+	a, ok := b.assets[css]
+	if !ok {
+		return
+	}
+	body := string(a.Body)
+	for p := range b.assets {
+		if strings.HasPrefix(p, "/static/") && p != css {
+			body = strings.ReplaceAll(body, "url("+p+")", "url("+b.versioned(p)+")")
+		}
+	}
+	b.assets[css] = newAsset(css, []byte(body))
 }
 
 func newAsset(name string, raw []byte) *Asset {

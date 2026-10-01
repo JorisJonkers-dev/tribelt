@@ -29,48 +29,166 @@
 <meta property="og:image:alt" content="{{.OGImageAlt}}">
 <meta name="twitter:card" content="summary_large_image">{{else}}
 <meta name="twitter:card" content="summary">{{end}}
+<meta name="theme-color" content="#f57503">
 <link rel="icon" href="data:,">
+{{- range .Fonts}}
+<link rel="preload" href="{{.}}" as="font" type="font/woff2" crossorigin>{{end}}
+{{- with .Hero}}
+<link rel="preload" as="image" href="{{.Src}}" {{.PreloadAttrs}} fetchpriority="high">{{end}}
 <link rel="stylesheet" href="{{.CSS}}">
 {{- if .JSONLD}}
 <script type="application/ld+json">{{.JSONLD}}</script>{{end}}
 <script src="{{.Beacon}}" defer data-hit="{{.Hit}}"></script>
 </head>
-<body>
+<body class="t-{{.Type}}{{if .Theme}} theme-{{.Theme}}{{end}}">
 <a class="skip" href="#main">{{.UI.Skip}}</a>
+<aside class="testbar" aria-label="{{.UI.Mirror}}">
+  <p><span class="tb-long">{{.UI.BarLong}}</span><span class="tb-short">{{.UI.BarShort}}</span>
+  <a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.UI.BarLink}}<span aria-hidden="true"> →</span></a></p>
+</aside>
 <header class="site-header">
-  <div class="wrap bar">
-    <a class="brand" href="{{.HomeHref}}">{{.SiteName}} <span class="brand-tag">{{.UI.Mirror}}</span></a>
-    <nav class="lang" aria-label="{{.UI.Language}}">
-      {{- range .Languages}}
-      {{if .Current}}<span aria-current="true" lang="{{.Hreflang}}">{{.Code}}</span>{{else}}<a href="{{.Href}}" hreflang="{{.Hreflang}}" lang="{{.Hreflang}}">{{.Code}}</a>{{end}}
-      {{- end}}
-    </nav>
+  <div class="hd">
+    <a class="brand" href="{{.HomeHref}}"><img src="{{.Logo}}" alt="{{.SiteName}}" width="150" height="50"></a>
+    <div class="menu" id="menu">
+      <nav class="nav-main" aria-label="{{.UI.Menu}}">
+        <ul>
+          {{- range .Nav}}{{if eq .Slot "main"}}
+          <li><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>
+          {{- end}}{{end}}
+        </ul>
+      </nav>
+      {{- range .Nav}}{{if eq .Slot "contact"}}
+      <a class="pill" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>
+      {{- end}}{{end}}
+      <div class="top-row">
+        <nav class="nav-util" aria-label="{{.UI.Utility}}">
+          <ul>
+            {{- range .Nav}}{{if eq .Slot "util"}}
+            <li><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>
+            {{- end}}{{end}}
+          </ul>
+        </nav>
+        <nav class="lang" aria-label="{{.UI.Language}}">
+          <ul>
+            {{- range .Languages}}
+            <li>{{if .Current}}<span aria-current="true" lang="{{.Hreflang}}">{{.Code}}</span>{{else}}<a href="{{.Href}}" hreflang="{{.Hreflang}}" lang="{{.Hreflang}}">{{.Code}}</a>{{end}}</li>
+            {{- end}}
+          </ul>
+        </nav>
+      </div>
+      <a class="menu-close" href="#">{{.UI.CloseMenu}}</a>
+    </div>
+    <div class="hd-actions">
+      {{.Auth}}
+      <a class="menu-btn" href="#menu" aria-controls="menu"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><circle cx="3" cy="8" r="1.6"/><circle cx="8" cy="3" r="1.6"/><circle cx="13" cy="8" r="1.6"/><circle cx="8" cy="13" r="1.6"/></svg>{{.UI.OpenMenu}}</a>
+    </div>
   </div>
-  <nav class="wrap main-nav" aria-label="{{.UI.Menu}}">
-    <ul>
-      {{- range .Nav}}
-      <li><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>
-      {{- end}}
-    </ul>
-  </nav>
 </header>
+{{end}}
+
+{{define "authbutton"}}<a class="auth" href="{{.Href}}" rel="nofollow" aria-label="{{.Label}}">{{if eq .Href "/stats"}}<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>{{else}}<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>{{end}}<span>{{.Label}}</span></a>{{end}}
+
+{{define "crumbs"}}{{if .Breadcrumbs}}
+<nav class="crumbs" aria-label="{{.UI.Breadcrumb}}">
+  <ol>
+    {{- range $i, $c := .Breadcrumbs}}
+    {{if and .Href (eq $i 0)}}<li class="crumb-home"><a href="{{.Href}}"><svg aria-hidden="true" viewBox="0 0 16 18" width="16" height="18" fill="currentColor"><path d="M8 0 0 6.5V18h16V6.5z"/></svg><span class="sr-only">{{.Name}}</span></a></li>{{else}}<li>{{if .Href}}<a href="{{.Href}}">{{.Name}}</a>{{else}}<span aria-current="page">{{.Name}}</span>{{end}}</li>{{end}}
+    {{- end}}
+  </ol>
+</nav>{{end}}{{end}}
+
+{{define "heroimg"}}<img class="hero-img" src="{{.Src}}"{{if .Srcset}} srcset="{{.Srcset}}" sizes="(min-width: 62em) calc(100vw - 60px), calc(100vw - 32px)"{{end}}{{if .Width}} width="{{.Width}}" height="{{.Height}}"{{end}} alt="{{.Alt}}" fetchpriority="high">
+    {{- if .Credit}}<span class="credit">{{.Credit}}</span>{{end}}{{end}}
+
+{{define "hero"}}
+{{- if eq .Type "home"}}
+<section class="hero hero-home">
+  <div class="hero-media">
+    {{with .Hero}}{{template "heroimg" .}}{{end}}
+    <div class="hero-home-text">
+      <h1>{{.H1}}</h1>
+      {{- if .CTA}}
+      <a class="btn btn-light" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a>{{end}}
+    </div>
+  </div>
+  <div class="help-box help-hero">
+    <p class="help-title">{{.Help.Title}}</p>
+    <a class="btn btn-light" href="{{.Help.Href}}" rel="nofollow">{{.Help.Label}}</a>
+  </div>
+</section>
+{{- else if .Hero}}
+<section class="hero hero-photo">
+  <div class="hero-media">
+    {{template "heroimg" .Hero}}
+  </div>
+  <div class="hero-box">
+    {{- template "crumbs" .}}
+    <h1>{{.H1}}</h1>
+    {{- if not (or (eq .Type "sector") (eq .Type "article") (eq .Type "news") (eq .Type "faq") (eq .Type "case"))}}
+    <p class="hero-intro">{{.Description}}</p>{{end}}
+    {{- if .CTA}}
+    <a class="btn btn-light" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a>{{end}}
+  </div>
+</section>
+{{- else}}
+<section class="hero hero-text">
+  <div class="wrap">
+    {{- template "crumbs" .}}
+    <h1>{{.H1}}</h1>
+    <p class="hero-intro">{{.Description}}</p>
+    {{- if .CTA}}
+    <a class="btn" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a>{{end}}
+  </div>
+</section>
+{{- end}}
 {{end}}
 
 {{define "foot"}}
 <footer class="site-footer">
   <div class="wrap">
-    <p class="note">{{.Footer.Note}}</p>
-    <p class="links">
-      <a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a>
-      <span aria-hidden="true">·</span>
-      <a href="{{.Footer.SiteURL}}">{{.Footer.SiteLabel}}</a>
+    <div class="help-box help-footer">
+      <p class="help-title">{{.Help.Title}}</p>
+      <a class="btn btn-dark" href="{{.Help.Href}}" rel="nofollow">{{.Help.Label}}</a>
+    </div>
+    <a class="ft-logo" href="{{.HomeHref}}"><img src="{{.LogoFooter}}" alt="{{.SiteName}}" width="210" height="71" loading="lazy"></a>
+    <div class="ft-cols">
+      <div>
+        <p class="ft-h">{{.UI.ContactCol}}</p>
+        <p>{{.Footer.Org.LegalName}}<br>{{.Footer.Org.Address.Street}}<br>{{.Footer.Org.Address.PostalCode}} {{.Footer.Org.Address.Locality}}</p>
+        <p>{{.Footer.Org.Telephone}}<br>{{.Footer.Org.Email}}</p>
+      </div>
+      <nav aria-label="{{.SiteName}}">
+        <p class="ft-h">{{.SiteName}}</p>
+        <ul>
+          {{- range .Nav}}
+          <li><a href="{{.Href}}">{{.Label}}</a></li>
+          {{- end}}
+        </ul>
+      </nav>
+      {{- if .Footer.Products}}
+      <nav aria-label="{{.Footer.ProductsLabel}}">
+        <p class="ft-h">{{.Footer.ProductsLabel}}</p>
+        <ul>
+          {{- range .Footer.Products}}
+          <li><a href="{{.Href}}">{{.Label}}</a></li>
+          {{- end}}
+        </ul>
+      </nav>{{end}}
+      <div>
+        <p class="ft-h">{{.UI.SiteCol}}</p>
+        <ul>
+          <li><a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a></li>
+          <li><a href="{{.Footer.SiteURL}}">{{.Footer.SiteLabel}}</a></li>
+          {{- if .MarkdownURL}}
+          <li><a href="{{.MarkdownURL}}" type="text/markdown">Markdown</a></li>{{end}}
+        </ul>
+      </div>
+    </div>
+    <div class="ft-sub">
+      <p>{{.UI.Attribution}}</p>
       {{- if .Footer.PrivacyHref}}
-      <span aria-hidden="true">·</span>
       <a href="{{.Footer.PrivacyHref}}">{{.Footer.PrivacyLabel}}</a>{{end}}
-      {{- if .MarkdownURL}}
-      <span aria-hidden="true">·</span>
-      <a href="{{.MarkdownURL}}" type="text/markdown">Markdown</a>{{end}}
-    </p>
+    </div>
   </div>
 </footer>
 </body>
@@ -78,31 +196,13 @@
 {{end}}
 
 {{define "page"}}{{template "head" .}}
-<main id="main" class="wrap">
-  {{- if .Breadcrumbs}}
-  <nav class="crumbs" aria-label="{{.UI.Breadcrumb}}">
-    <ol>
-      {{- range .Breadcrumbs}}
-      <li>{{if .Href}}<a href="{{.Href}}">{{.Name}}</a>{{else}}<span aria-current="page">{{.Name}}</span>{{end}}</li>
-      {{- end}}
-    </ol>
-  </nav>
-  {{- end}}
-  <article class="page page-{{.Type}}">
-    <h1>{{.H1}}</h1>
-    {{- if .Image}}
-    <figure class="lead">
-      <img src="{{.Image.Src}}"{{if .Image.Srcset}} srcset="{{.Image.Srcset}}" sizes="(min-width: 60rem) 56rem, 100vw"{{end}}{{if .Image.Width}} width="{{.Image.Width}}" height="{{.Image.Height}}"{{end}} alt="{{.Image.Alt}}" fetchpriority="high">
-      {{- if .Image.Credit}}<figcaption>{{.Image.Credit}}</figcaption>{{end}}
-    </figure>
-    {{- end}}
-    {{- if .CTA}}
-    <p class="cta-top"><a class="cta" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a></p>
-    {{- end}}
-    <div class="prose">{{.Body}}</div>
-    {{- if .Product}}
-    <section class="specs" aria-labelledby="specs-h">
-      <h2 id="specs-h">{{.UI.Specs}}</h2>
+<main id="main" tabindex="-1">
+  {{- template "hero" .}}
+  <div class="body">{{.Body}}</div>
+  {{- if .Product}}
+  <section class="specs" aria-labelledby="specs-h">
+    <div class="wrap split">
+      <h2 id="specs-h" class="label">{{.UI.Specs}}</h2>
       <table>
         <caption>{{.Product.Name}}{{if .Product.Category}} · {{.Product.Category}}{{end}}</caption>
         <tbody>
@@ -114,31 +214,42 @@
           {{- end}}
         </tbody>
       </table>
-    </section>
-    {{- end}}
-    {{- if .FAQ}}
-    <section class="faq" aria-labelledby="faq-h">
-      <h2 id="faq-h">{{.UI.FAQ}}</h2>
-      {{- range .FAQ}}
-      <details>
-        <summary>{{.Q}}</summary>
-        <div class="answer">{{.A}}</div>
-      </details>
-      {{- end}}
-    </section>
-    {{- end}}
-    {{- if .CTA}}
-    <p class="cta-bottom"><a class="cta" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a></p>
-    {{- end}}
-  </article>
+    </div>
+  </section>
+  {{- end}}
+  {{- if .FAQ}}
+  <section class="faq" aria-labelledby="faq-h">
+    <div class="wrap split">
+      <h2 id="faq-h" class="label">{{.UI.FAQ}}</h2>
+      <div class="faq-list">
+        {{- range .FAQ}}
+        <details>
+          <summary>{{.Q}}</summary>
+          <div class="answer">{{.A}}</div>
+        </details>
+        {{- end}}
+      </div>
+    </div>
+  </section>
+  {{- end}}
+  {{- if and .CTA (ne .Type "home")}}
+  <section class="cta-band">
+    <div class="wrap">
+      <a class="btn btn-xl" href="{{.CTA.Href}}" rel="nofollow">{{.CTA.Label}}</a>
+    </div>
+  </section>
+  {{- end}}
 </main>
 {{template "foot" .}}{{end}}
 
 {{define "notfound"}}{{template "head" .}}
-<main id="main" class="wrap">
-  <article class="page">
-    <h1>{{.H1}}</h1>
-    <div class="prose"><p>{{.Description}}</p><p><a href="{{.HomeHref}}">{{.UI.BackHome}}</a></p></div>
-  </article>
+<main id="main" tabindex="-1">
+  <section class="hero hero-text">
+    <div class="wrap">
+      <h1>{{.H1}}</h1>
+      <p class="hero-intro">{{.Description}}</p>
+      <a class="btn" href="{{.HomeHref}}">{{.UI.BackHome}}</a>
+    </div>
+  </section>
 </main>
 {{template "foot" .}}{{end}}

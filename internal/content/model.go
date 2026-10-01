@@ -61,7 +61,8 @@ type NavItem struct {
 	ID    string `yaml:"id"`
 }
 
-// Footer carries the student-project note shown on every page.
+// Footer carries the footer link labels and the student-project note that opens every Markdown twin
+// (HTML pages say the same in the test-site bar).
 type Footer struct {
 	Note              string `yaml:"note"`
 	OfficialLabel     string `yaml:"officialLabel"`

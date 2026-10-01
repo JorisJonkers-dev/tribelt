@@ -8,3 +8,4 @@ visits.out
 **/node_modules
 **/*_test.go
 **/testdata
+web/static/site.css

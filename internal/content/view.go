@@ -3,27 +3,32 @@ package content
 import (
 	"html/template"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 )
 
 type pageView struct {
 	Lang, Title, Description, Keywords, Canonical string
+	Path                                          string
 	Noindex                                       bool
 	Alternates                                    []altLink
 	MarkdownURL                                   string
 	OGType, OGLocale, OGImage, OGImageAlt         string
 	OGAltLocales                                  []string
-	SiteName, HomeHref, CSS, Beacon, Hit          string
+	SiteName, HomeHref, CSS, Beacon, Hit, Auth    string
+	Logo, LogoFooter                              string
+	Fonts                                         []string
 	JSONLD                                        template.JS
 	UI                                            UI
 	Languages                                     []langLink
 	Nav                                           []navLink
 	Breadcrumbs                                   []crumb
-	Type, H1                                      string
+	Type, H1, Theme                               string
 	Image                                         *imageView
+	Hero                                          *imageView
+	Help                                          helpView
 	Body                                          template.HTML
 	Product                                       *Product
 	FAQ                                           []faqView
@@ -41,7 +46,12 @@ type langLink struct {
 type navLink struct {
 	Label, Href string
 	Current     bool
+	// Slot places the link: main (header bar), util (top row) or contact (the pill button).
+	Slot string
 }
+
+// helpView is the "how can we help" box that links to the Official Page for contact.
+type helpView struct{ Title, Label, Href string }
 
 type crumb struct{ Name, Href string }
 
@@ -50,13 +60,28 @@ type imageView struct {
 	Width, Height            int
 }
 
+// heroSizes is the rendered width of a hero image, shared by the <img> and its preload.
+const heroSizes = "(min-width: 62em) calc(100vw - 60px), calc(100vw - 32px)"
+
+// PreloadAttrs are the responsive attributes of the hero preload link. html/template would treat
+// imagesrcset as one URL and escape its spaces, so the pair is built here.
+func (v *imageView) PreloadAttrs() template.HTMLAttr {
+	if v.Srcset == "" {
+		return ""
+	}
+	return template.HTMLAttr(`imagesrcset="` + template.HTMLEscapeString(v.Srcset) + `" imagesizes="` + heroSizes + `"`) //nolint:gosec // escaped above; sizes is a constant
+}
+
 type faqView struct {
 	Q string
 	A template.HTML
 }
 
 type footerView struct {
-	Note, OfficialLabel, OfficialHref, SiteURL, SiteLabel, PrivacyHref, PrivacyLabel string
+	OfficialLabel, OfficialHref, SiteURL, SiteLabel, PrivacyHref, PrivacyLabel string
+	ProductsLabel                                                              string
+	Products                                                                   []navLink
+	Org                                                                        Org
 }
 
 func (b *builder) common(locale string) pageView {
@@ -64,9 +89,10 @@ func (b *builder) common(locale string) pageView {
 	home := b.c.Home(locale)
 	v := pageView{
 		Lang: l.Hreflang, SiteName: b.c.Site.Org.Name, HomeHref: home.Path, CSS: b.css, Beacon: b.beacon, Hit: HitPlaceholder,
-		UI: uiStrings(locale), OGType: "website", OGLocale: ogLocale(locale),
+		Auth: AuthPlaceholder, Logo: b.versioned("/static/logo-header.svg"), LogoFooter: b.versioned("/static/logo-footer.svg"),
+		Fonts: b.fonts, UI: uiStrings(locale), OGType: "website", OGLocale: ogLocale(locale),
 		Footer: footerView{
-			Note: l.Footer.Note, OfficialLabel: l.Footer.OfficialLabel, SiteURL: b.c.Site.Official,
+			OfficialLabel: l.Footer.OfficialLabel, SiteURL: b.c.Site.Official, Org: b.c.Site.Org,
 			SiteLabel: or(l.Footer.OfficialSiteLabel, "tribelt.nl"), PrivacyLabel: or(l.Footer.PrivacyLabel, uiStrings(locale).Privacy),
 		},
 	}
@@ -77,7 +103,15 @@ func (b *builder) common(locale string) pageView {
 	}
 	for _, n := range l.Nav {
 		if t := b.c.InLocale(n.ID, locale); t != nil {
-			v.Nav = append(v.Nav, navLink{Label: n.Label, Href: t.Path})
+			v.Nav = append(v.Nav, navLink{Label: n.Label, Href: t.Path, Slot: navSlot(n.ID)})
+			if t.ID == "metalen-transportbanden" {
+				v.Footer.ProductsLabel = n.Label
+			}
+		}
+	}
+	for _, p := range b.c.Pages {
+		if p.Locale == locale && p.Type == "product" {
+			v.Footer.Products = append(v.Footer.Products, navLink{Label: p.H1, Href: p.Path})
 		}
 	}
 	for _, code := range LocaleOrder() {
@@ -94,6 +128,7 @@ func (b *builder) pageView(md goldmark.Markdown, p *Page) (pageView, error) {
 	v.MarkdownURL = TwinPath(p.Path)
 	v.Type, v.H1, v.Product = p.Type, p.H1, p.Product
 	v.Footer.OfficialHref = GoLink(p.Official, p.Path)
+	v.Path, v.Help = p.Path, b.help(p.Locale, p.Path)
 	switch p.Type {
 	case "article", "news", "case":
 		v.OGType = "article"
@@ -111,10 +146,14 @@ func (b *builder) pageView(md goldmark.Markdown, p *Page) (pageView, error) {
 	}
 	v.Breadcrumbs = b.breadcrumbs(p)
 	if p.Image != nil {
-		v.Image = b.imageView(p.Image)
+		v.Image = b.pageImage(p)
 		v.OGImage, v.OGImageAlt = b.abs(v.Image.Src), p.Image.Alt
 	}
-	body, err := renderMarkdown(md, p.Body, p.Path)
+	v.Hero = b.pageImage(p)
+	if p.Type == "sector" || p.Type == "news" || p.ID == "sectoren" {
+		v.Theme = "blue"
+	}
+	body, err := renderWith(md, p.Body, p.Path, func(doc ast.Node, src []byte) { b.layout(doc, src, p) })
 	if err != nil {
 		return v, err
 	}
@@ -162,7 +201,30 @@ func (b *builder) notFoundView(locale string) pageView {
 	ui := v.UI
 	v.Title, v.H1, v.Description, v.Noindex = ui.NotFoundTitle+" | "+b.c.Site.Org.Name, ui.NotFoundTitle, ui.NotFoundText, true
 	v.Footer.OfficialHref = GoLink(b.c.Site.Official+b.c.Home(locale).Path, b.c.Home(locale).Path)
+	v.Help = b.help(locale, b.c.Home(locale).Path)
+	v.Type = "notfound"
 	return v
+}
+
+// navSlot places the pages Tribelt keeps in its top row there, and contact in the pill button.
+func navSlot(id string) string {
+	switch id {
+	case "werken-bij-tribelt", "nieuws", "veelgestelde-vragen":
+		return "util"
+	case "contact":
+		return "contact"
+	}
+	return "main"
+}
+
+// help links the "how can we help" box to the Official Page for contact, as an Outbound Click.
+func (b *builder) help(locale, from string) helpView {
+	ui := uiStrings(locale)
+	to := b.c.Site.Official + "/contact"
+	if c := b.c.InLocale("contact", locale); c != nil {
+		to = c.Official
+	}
+	return helpView{Title: ui.HelpTitle, Label: ui.HelpLink, Href: GoLink(to, from)}
 }
 
 func alternateIn(p *Page, locale string) *Page {
@@ -189,28 +251,6 @@ func (b *builder) breadcrumbs(p *Page) []crumb {
 	}
 	crumbs = append(crumbs, middle...)
 	return append(crumbs, crumb{Name: p.H1})
-}
-
-func (b *builder) imageView(img *Image) *imageView {
-	name := strings.TrimPrefix(img.Src, "images/")
-	v := &imageView{Src: "/images/" + name, Alt: img.Alt, Credit: img.Credit}
-	info, ok := b.images[name]
-	if ok {
-		v.Width, v.Height = info.width, info.height
-	}
-	base := strings.TrimSuffix(name, path.Ext(name))
-	var set []string
-	for _, w := range []int{480, 960} {
-		variant := base + "-" + strconv.Itoa(w) + path.Ext(name)
-		if b.c.Images[variant] {
-			set = append(set, "/images/"+variant+" "+strconv.Itoa(w)+"w")
-		}
-	}
-	if len(set) > 0 && ok {
-		set = append(set, v.Src+" "+strconv.Itoa(info.width)+"w")
-		v.Srcset = strings.Join(set, ", ")
-	}
-	return v
 }
 
 // TwinPath is the Markdown twin URL of a page path.

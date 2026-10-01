@@ -10,5 +10,5 @@ var Templates embed.FS
 
 // Static holds CSS and the small scripts (beacon, chart PNG export).
 //
-//go:embed static/*
+//go:embed static
 var Static embed.FS

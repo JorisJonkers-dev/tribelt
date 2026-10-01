@@ -300,4 +300,7 @@ func TestDevBypass(t *testing.T) {
 	if do(mux, "GET", "/stats").Code != 204 || do(mux, "POST", "/auth/logout").Code != http.StatusSeeOther {
 		t.Fatal("bypass routes")
 	}
+	if rec := do(mux, "GET", "/auth/login?next=//evil.example"); rec.Code != http.StatusFound || rec.Header().Get("Location") != "/stats" {
+		t.Fatalf("bypass login goes to the stats: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
 }

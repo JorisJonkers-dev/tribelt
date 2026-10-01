@@ -44,12 +44,20 @@ tasks:
     desc: actionlint on every workflow
     cmd: actionlint
 
+  css:
+    desc: Build the public stylesheet with the Tailwind standalone CLI (web/css -> web/static/site.css)
+    sources: [web/css/*.css, web/templates/public.html]
+    generates: [web/static/site.css]
+    cmd: tailwindcss --input web/css/site.css --output web/static/site.css --minify
+
   vet:
     desc: go vet
+    deps: [css]
     cmd: go vet ./...
 
   test:
     desc: Go tests (race, real Postgres via testcontainers, real content/ gates) with a {{.COVERAGE_MIN}}% coverage gate
+    deps: [css]
     cmds:
       - go test -race -count=1 -covermode=atomic -coverpkg=./internal/... -coverprofile=coverage.out ./...
       - |
@@ -72,6 +80,7 @@ tasks:
 
   build:
     desc: Build the service binary
+    deps: [css]
     env:
       CGO_ENABLED: "0"
     cmd: go build -trimpath -o bin/{{.APP}} ./cmd/{{.APP}}
@@ -109,7 +118,7 @@ tasks:
 
   dev:
     desc: Run against local Postgres with the stats sign-in bypassed (never in production)
-    deps: [db]
+    deps: [db, css]
     env:
       DATABASE_URL: "{{.DATABASE_URL}}"
       DEV_AUTH_BYPASS: "1"
