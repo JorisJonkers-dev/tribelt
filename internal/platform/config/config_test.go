@@ -15,6 +15,12 @@ func TestDefaults(t *testing.T) {
 	if c.Addr != ":8080" || !c.AutoMigrate || c.Production || c.HTTPS() || c.Host() != "localhost" || c.OIDCConfigured() || c.VisitorHMACKey == "" {
 		t.Fatalf("%+v", c)
 	}
+	for v, want := range map[string][2]bool{"1": {true, false}, "viewer": {true, true}, "yes": {false, false}, " ": {false, false}} {
+		c, _ := Load(env(map[string]string{"DEV_AUTH_BYPASS": v}))
+		if c.DevAuthBypass != want[0] || c.DevAuthViewer != want[1] {
+			t.Errorf("DEV_AUTH_BYPASS=%q: %v %v", v, c.DevAuthBypass, c.DevAuthViewer)
+		}
+	}
 }
 
 func TestProductionContract(t *testing.T) {
@@ -32,6 +38,7 @@ func TestProductionContract(t *testing.T) {
 	}
 	for _, mutate := range []func(m map[string]string){
 		func(m map[string]string) { m["DEV_AUTH_BYPASS"] = "1" },
+		func(m map[string]string) { m["DEV_AUTH_BYPASS"] = "viewer" },
 		func(m map[string]string) { m["OIDC_CLIENT_SECRET"] = "" },
 		func(m map[string]string) { m["VISITOR_HMAC_KEY"] = "" },
 		func(m map[string]string) { m["SESSION_KEY"] = "short" },

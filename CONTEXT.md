@@ -109,10 +109,31 @@ Per-page, per-day query, impression, click and position figures reported by
 Google Search Console and Bing Webmaster Tools. Not derived from Hits.
 _Avoid_: rankings, SEO data
 
+**Search Performance source**:
+The search engine a Search Performance figure comes from: `google` or `bing`.
+Its credential is either saved in the UI or managed by Vault; the UI one wins.
+_Avoid_: provider, feed
+
+### Integrations
+
+**Integration**:
+A connection to an outside service the mirror reads from or reports to: Google
+Search Console, Bing Webmaster Tools, IndexNow or Cloudflare analytics. Has at
+most one credential, a selected property, site or zone, a sync status and an
+audit history. Only an admin changes one.
+_Avoid_: connector, plugin, provider
+
+**Edge request**:
+A request as Cloudflare counted it before it reached the mirror, per UTC day.
+Includes static assets, the beacon and requests Cloudflare blocked, so it is
+never a Hit.
+_Avoid_: CDN hit, edge hit
+
 ### Access
 
 **Stats Viewer**:
 An auth-api admin, or a person holding the Tribelt stats service permission.
+Only an admin may change an Integration; the others see it read-only.
 
 ## Relationships
 
@@ -124,6 +145,8 @@ An auth-api admin, or a person holding the Tribelt stats service permission.
 - A **Hit** belongs to a **Visitor** when the client holds a Visitor ID, otherwise to a **Daily Visitor**
 - A **Visitor** has exactly one **First-touch Channel**
 - A **Daily Visitor** makes one or more **Hits** within a single day
+- A **Search Performance source** is one **Integration**; a new **Content Release** is submitted
+  through the IndexNow **Integration**
 
 ## Flagged ambiguities
 

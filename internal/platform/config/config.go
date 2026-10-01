@@ -16,6 +16,8 @@ type Config struct {
 	Production    bool
 	AutoMigrate   bool
 	DevAuthBypass bool
+	// DevAuthViewer makes the bypass a read-only Stats Viewer instead of an admin (DEV_AUTH_BYPASS=viewer).
+	DevAuthViewer bool
 
 	OIDCIssuer, OIDCClientID, OIDCClientSecret, OIDCRedirectURL string
 
@@ -55,7 +57,8 @@ func Load(getenv func(string) string) (Config, error) {
 		BaseURL:               strings.TrimSuffix(get("BASE_URL", "http://localhost:8080"), "/"),
 		Production:            get("TRIBELT_ENV", "") == "production",
 		AutoMigrate:           get("AUTO_MIGRATE", "true") == "true",
-		DevAuthBypass:         get("DEV_AUTH_BYPASS", "") == "1",
+		DevAuthBypass:         get("DEV_AUTH_BYPASS", "") == "1" || get("DEV_AUTH_BYPASS", "") == "viewer",
+		DevAuthViewer:         get("DEV_AUTH_BYPASS", "") == "viewer",
 		OIDCIssuer:            get("OIDC_ISSUER", ""),
 		OIDCClientID:          get("OIDC_CLIENT_ID", ""),
 		OIDCClientSecret:      get("OIDC_CLIENT_SECRET", ""),

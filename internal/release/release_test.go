@@ -105,3 +105,31 @@ func TestSyncErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestPreviousRelease(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, pgtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	q := queries.New(pool)
+	if label, hashes, err := Previous(ctx, q); label != "" || hashes != nil || err != nil {
+		t.Fatalf("no release yet: %q %v %v", label, hashes, err)
+	}
+	c, err := content.Load(os.DirFS("../content/testdata/content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Sync(ctx, q, c, "0.4.0"); err != nil {
+		t.Fatal(err)
+	}
+	label, hashes, err := Previous(ctx, q)
+	if err != nil || label != c.Site.Release.Label || len(hashes) != len(c.Pages) || hashes["/"] != Hashes(c)["/"] {
+		t.Fatalf("previous %q %d %v", label, len(hashes), err)
+	}
+	pool.Close()
+	if _, _, err := Previous(ctx, q); err == nil {
+		t.Fatal("a database error surfaces")
+	}
+}

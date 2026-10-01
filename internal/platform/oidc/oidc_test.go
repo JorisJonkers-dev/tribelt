@@ -159,17 +159,18 @@ func TestLoginCallbackRoles(t *testing.T) {
 		name   string
 		claims map[string]any
 		status int
+		admin  bool
 	}{
-		{"service permission", map[string]any{"roles": []string{"ROLE_USER", "SERVICE_TRIBELT"}}, http.StatusFound},
-		{"admin", map[string]any{"roles": []string{"ROLE_ADMIN"}}, http.StatusFound},
-		{"missing roles", map[string]any{}, http.StatusForbidden},
-		{"other service", map[string]any{"roles": []string{"SERVICE_NOTES"}}, http.StatusForbidden},
+		{"service permission", map[string]any{"roles": []string{"ROLE_USER", "SERVICE_TRIBELT"}}, http.StatusFound, false},
+		{"admin", map[string]any{"roles": []string{"ROLE_ADMIN"}}, http.StatusFound, true},
+		{"missing roles", map[string]any{}, http.StatusForbidden, false},
+		{"other service", map[string]any{"roles": []string{"SERVICE_NOTES"}}, http.StatusForbidden, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFakeIssuer(t)
 			f.next = tc.claims
-			_, mux := newAuth(t, f)
+			a, mux := newAuth(t, f)
 			state, flowC := login(t, f, mux)
 			rec := do(mux, "GET", "/auth/callback?code=good-code&state="+state, flowC)
 			if rec.Code != tc.status {
@@ -190,6 +191,14 @@ func TestLoginCallbackRoles(t *testing.T) {
 			}
 			if got := do(mux, "GET", "/stats", sess); got.Code != 200 || got.Body.String() != "hello joris" {
 				t.Fatalf("stats with session: %d %s", got.Code, got.Body)
+			}
+			req := httptest.NewRequest("GET", "/stats", nil)
+			req.AddCookie(sess)
+			if v, _ := a.Viewer(req); v.Admin != tc.admin {
+				t.Fatalf("admin = %v, want %v", v.Admin, tc.admin)
+			}
+			if a.Session(req) != sess.Value || a.Session(httptest.NewRequest("GET", "/stats", nil)) != "" {
+				t.Fatal("the session is the sealed cookie, only while signed in")
 			}
 			out := do(mux, "POST", "/auth/logout", sess)
 			loc, _ := url.Parse(out.Header().Get("Location"))
@@ -293,6 +302,13 @@ func TestDevBypass(t *testing.T) {
 	}
 	if _, ok := g.Viewer(httptest.NewRequest("GET", "/", nil)); ok {
 		t.Fatal("public pages stay non-internal")
+	}
+	if v, _ := g.Viewer(httptest.NewRequest("GET", "/stats", nil)); !v.Admin || g.Session(httptest.NewRequest("GET", "/stats", nil)) == "" {
+		t.Fatal("the bypass is an admin with a fixed session")
+	}
+	ro := DevBypass{ReadOnly: true}
+	if v, _ := ro.Viewer(httptest.NewRequest("GET", "/stats", nil)); v.Admin || ro.Session(httptest.NewRequest("GET", "/", nil)) != "" {
+		t.Fatal("DEV_AUTH_BYPASS=viewer is read-only")
 	}
 	mux := http.NewServeMux()
 	g.Routes(mux)

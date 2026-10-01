@@ -128,7 +128,7 @@ func seed(t *testing.T) seeded {
 			t.Fatal(err)
 		}
 	}
-	for _, s := range []PerfRow{
+	for _, s := range []queries.UpsertSearchPerformanceParams{
 		{Source: "google", Day: at(8), Page: "https://mirror.test/sectoren", Path: "/sectoren", Query: "metalen transportbanden", Clicks: 2, Impressions: 40, Ctr: 0.05, Position: 8},
 		{Source: "google", Day: at(2), Page: "https://mirror.test/sectoren", Path: "/sectoren", Query: "transportband sectoren", Clicks: 1, Impressions: 10, Ctr: 0.1, Position: 3},
 		{Source: "bing", Day: at(2), Page: "https://mirror.test/sectoren", Path: "/sectoren", Query: "tribelt", Clicks: 0, Impressions: 5, Ctr: 0, Position: 2},

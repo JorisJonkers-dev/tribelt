@@ -1,0 +1,199 @@
+{{define "integrations"}}{{template "top" .}}{{with .Data}}
+{{template "heading" (heading "Integrations" "Search engines, IndexNow and Cloudflare analytics. A credential saved here is sealed in Postgres, never shown again, and takes precedence over one managed by Vault.")}}
+{{if not .Admin}}
+<p class="m-0 flex items-center gap-2.5 rounded-[10px] border border-line bg-raised px-3.5 py-3 text-[13px] text-muted">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+  Read-only: you see connection status, syncs and errors. Only an administrator can connect or change an integration.
+</p>
+{{else if not .Storage}}
+<p class="m-0 rounded-[10px] bg-warn-bg px-3.5 py-3 text-[13px] text-warn">Credential storage is off because SESSION_KEY is not set. Vault-managed sources still work; nothing can be saved here.</p>
+{{end}}
+{{if or .Flash .FlashErr}}
+<p role="status" class="m-0 rounded-[10px] px-3.5 py-3 text-[13px] {{if .FlashErr}}bg-err-bg text-err{{else}}bg-up-bg text-up{{end}}">{{if .FlashKind}}<span class="font-semibold">{{kindTitle .FlashKind}}:</span> {{end}}{{if .FlashErr}}{{.FlashErr}}{{else}}{{.Flash}}{{end}}</p>
+{{end}}
+<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+  {{range .Cards}}{{template "int-card" (intCard $.Data .)}}{{end}}
+</div>
+{{with .Compare}}{{template "int-compare" .}}{{end}}
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "int-pill"}}<span class="{{if eq .Status "connected"}}pill-ok{{else if eq .Status "error"}}pill-err{{else if eq .Status "vault"}}pill-vault{{else if eq .Status "none"}}pill-none{{else}}pill-partial{{end}}">{{.Label}}</span>{{end}}
+
+{{define "int-csrf"}}<input type="hidden" name="csrf" value="{{.}}">{{end}}
+
+{{define "int-card"}}{{$c := .Card}}{{$p := .Page}}
+<section id="{{$c.Kind}}" aria-labelledby="{{$c.Kind}}-title" class="card flex min-w-0 flex-col gap-4 px-4 py-5 sm:px-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex min-w-0 flex-col gap-1">
+      <h2 id="{{$c.Kind}}-title" class="h2">{{$c.Title}}</h2>
+      <span class="sub">{{if eq $c.Source "ui"}}Saved in the UI{{if $c.Shadowed}} · overrides the Vault-managed credential{{end}}{{else if eq $c.Source "vault"}}Managed by Vault ({{range $i, $v := $c.EnvVars}}{{if $i}}, {{end}}<code class="font-mono text-xs">{{$v}}</code>{{end}}){{else}}No credential{{end}}</span>
+    </div>
+    <span class="flex items-center gap-2">{{if $c.Running}}<span class="pill-partial">Sync running</span>{{end}}{{template "int-pill" $c}}</span>
+  </div>
+
+  {{if $c.Error}}<p class="m-0 rounded-[10px] bg-err-bg px-3.5 py-2.5 text-[13px] text-err">{{$c.Error}} <span class="font-mono text-xs opacity-80">({{$c.ErrorCode}})</span></p>{{end}}
+
+  <dl class="m-0 grid grid-cols-1 gap-x-6 gap-y-2.5 text-[13px] sm:grid-cols-2">
+    {{if eq $c.Kind "cloudflare"}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Zone</dt><dd class="m-0 truncate font-mono">{{if $c.Zone}}{{$c.Zone}}{{if $c.Plan}} · {{$c.Plan}}{{end}}{{else if $c.Target}}{{$c.Target}}{{else}}—{{end}}</dd></div>
+    {{else if eq $c.Kind "indexnow"}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Key location</dt><dd class="m-0 truncate font-mono">{{if $c.KeyURL}}<a href="{{$c.KeyURL}}">{{$c.KeyURL}}</a>{{else}}—{{end}}</dd></div>
+    {{else}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">{{if eq $c.Kind "google"}}Property{{else}}Site{{end}}</dt><dd class="m-0 truncate font-mono">{{or $c.Target "—"}}</dd></div>{{end}}
+    {{if $c.Account}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Service account</dt><dd class="m-0 truncate font-mono">{{$c.Account}}</dd></div>{{end}}
+    {{if $c.Fingerprint}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Credential fingerprint</dt><dd class="m-0 font-mono">{{$c.Fingerprint}}</dd></div>{{end}}
+    {{if $c.SavedBy}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Saved</dt><dd class="m-0">{{$c.SavedBy}} · {{$c.SavedAt}}{{if and $c.ChangedBy (ne $c.ChangedAt $c.SavedAt)}}<span class="block text-xs text-muted">changed by {{$c.ChangedBy}} · {{$c.ChangedAt}}</span>{{end}}</dd></div>{{end}}
+    {{if eq $c.Kind "indexnow"}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Last submission</dt><dd class="m-0">{{or $c.LastSync "never"}}{{if $c.LastSubmission}}<span class="block text-xs text-muted">{{$c.LastSubmission}}</span>{{end}}</dd></div>
+    {{else}}<div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Last sync</dt><dd class="m-0">{{or $c.LastSync "never"}}{{if and $c.LastSuccess (ne $c.LastSuccess $c.LastSync)}}<span class="block text-xs text-muted">last success {{$c.LastSuccess}}</span>{{end}}</dd></div>
+    <div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Next sync</dt><dd class="m-0">{{if not $c.Enabled}}paused{{else if eq $c.Status "none"}}—{{else}}{{or $c.NextSync "within minutes"}}{{end}}</dd></div>{{end}}
+    <div class="flex min-w-0 flex-col gap-0.5"><dt class="text-xs text-muted">Stored</dt><dd class="m-0 font-mono">{{$c.Rows}}</dd></div>
+  </dl>
+
+  {{if and (eq $c.Kind "cloudflare") (ne $c.Status "none")}}{{if $c.Dims}}<div class="flex flex-col gap-2">
+    <span class="text-xs text-muted">Breakdowns this plan allows{{if $c.Window}} · {{$c.Window}}{{end}}</span>
+    <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">{{range $c.Dims}}<li class="rounded-full border px-2.5 py-1 text-xs {{if not .Known}}border-line text-muted{{else if .Available}}border-strong text-ink{{else}}border-line text-off line-through{{end}}"><span class="font-mono">{{.Field}}</span>{{if not .Known}}<span class="sr-only"> (not checked yet)</span>{{else if not .Available}}<span class="sr-only"> (not on this plan)</span>{{end}}</li>{{end}}</ul>
+    {{if not (index $c.Dims 0).Known}}<span class="text-xs text-muted">Run Test to read the plan's analytics fields.</span>{{end}}
+  </div>{{end}}{{end}}
+
+  {{if $p.Admin}}
+  {{if $c.Choices}}
+  <form method="post" action="/stats/integrations/{{$c.Kind}}/select" class="flex flex-col gap-2 rounded-[10px] border border-hair p-3">
+    {{template "int-csrf" $p.CSRF}}
+    <label for="{{$c.Kind}}-target" class="text-[13px] font-medium">{{if eq $c.Kind "google"}}Search Console property{{else}}Bing site{{end}} to import</label>
+    <div class="flex flex-wrap gap-2">
+      <select id="{{$c.Kind}}-target" name="target" class="field min-w-0 grow font-mono text-ink">
+        {{range $c.Choices}}<option value="{{.}}"{{if eq . $c.Target}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <button type="submit" class="btn-light">Save selection</button>
+    </div>
+  </form>
+  {{else if $c.ChoicesErr}}<p class="m-0 text-[13px] text-err">Could not list what this credential can see: {{$c.ChoicesErr}}</p>
+  {{else if and (eq $c.Source "ui") (or (eq $c.Kind "google") (eq $c.Kind "bing"))}}<a href="/stats/integrations?pick={{$c.Kind}}#{{$c.Kind}}" class="text-[13px]">Change the {{if eq $c.Kind "google"}}property{{else}}site{{end}}</a>{{end}}
+
+  {{if ne $c.Status "none"}}
+  <div class="flex flex-wrap gap-2">
+    <form method="post" action="/stats/integrations/{{$c.Kind}}/test" class="m-0">{{template "int-csrf" $p.CSRF}}<button type="submit" class="btn-sm">Test connection</button></form>
+    {{if eq $c.Kind "indexnow"}}<form method="post" action="/stats/integrations/indexnow/notify" class="m-0">{{template "int-csrf" $p.CSRF}}<button type="submit" class="btn-sm">Notify now</button></form>
+    {{else}}<form method="post" action="/stats/integrations/{{$c.Kind}}/sync" class="m-0">{{template "int-csrf" $p.CSRF}}<button type="submit" class="btn-sm">Sync now</button></form>
+    <form method="post" action="/stats/integrations/{{$c.Kind}}/{{if $c.Enabled}}disable{{else}}enable{{end}}" class="m-0">{{template "int-csrf" $p.CSRF}}<button type="submit" class="btn-sm">{{if $c.Enabled}}Pause daily sync{{else}}Resume daily sync{{end}}</button></form>{{end}}
+    {{if eq $c.Source "ui"}}<form method="post" action="/stats/integrations/{{$c.Kind}}/remove" class="m-0">{{template "int-csrf" $p.CSRF}}<button type="submit" class="btn-danger">Remove</button></form>{{end}}
+  </div>
+  {{end}}
+
+  {{if eq $p.Confirm $c.Kind}}
+  <div role="alert" class="flex flex-col gap-3 rounded-[10px] border border-err bg-err-bg p-3.5">
+    <p class="m-0 text-[13px] text-ink">Remove the saved {{$c.Title}} credential{{if $c.Fingerprint}} (fingerprint <span class="font-mono">{{$c.Fingerprint}}</span>){{end}}? {{if $c.VaultSet}}The Vault-managed credential takes over again.{{else}}The integration stops until a new credential is saved.{{end}} Imported data stays.</p>
+    <div class="flex flex-wrap gap-2">
+      <form method="post" action="/stats/integrations/{{$c.Kind}}/remove" class="m-0">{{template "int-csrf" $p.CSRF}}<input type="hidden" name="confirm" value="yes"><button type="submit" class="btn-danger">Yes, remove it</button></form>
+      <a href="/stats/integrations#{{$c.Kind}}" class="btn-sm">Cancel</a>
+    </div>
+  </div>
+  {{end}}
+
+  {{if $p.Storage}}
+  <details class="rounded-[10px] border border-hair"{{if eq $c.Status "none"}} open{{end}}>
+    <summary class="flex min-h-11 items-center px-3 text-[13px] font-medium">{{if eq $c.Source "ui"}}Replace the credential{{else if eq $c.Kind "indexnow"}}Generate a key{{else}}Connect{{if eq $c.Source "vault"}} here instead of Vault{{end}}{{end}}</summary>
+    <div class="flex flex-col gap-3 border-t border-hair p-3">
+    {{if eq $c.Kind "indexnow"}}
+      <form method="post" action="/stats/integrations/indexnow/generate" class="m-0 flex flex-col gap-2">
+        {{template "int-csrf" $p.CSRF}}
+        <p class="m-0 text-[13px] text-muted">{{if $c.KeyURL}}A new key replaces the old one; the old key file stops being served at once.{{else}}Creates a random 32-character key and serves it at its key location.{{end}}</p>
+        <button type="submit" class="btn-light self-start">{{if $c.KeyURL}}Generate a new key{{else}}Generate key{{end}}</button>
+      </form>
+    {{else}}
+      <form method="post" action="/stats/integrations/{{$c.Kind}}/connect"{{if eq $c.Kind "google"}} enctype="multipart/form-data"{{end}} class="m-0 flex flex-col gap-3">
+        {{template "int-csrf" $p.CSRF}}
+        {{if eq $c.Kind "google"}}
+        <label class="flex flex-col gap-1.5 text-[13px] font-medium">Service account key file (JSON, at most 64 KB)
+          <input type="file" name="credential_file" accept="application/json,.json" class="text-[13px] font-normal text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-lg file:border file:border-strong file:bg-panel file:px-3 file:text-ink">
+        </label>
+        <label class="flex flex-col gap-1.5 text-[13px] font-medium">or paste its contents
+          <textarea name="credential" rows="4" autocomplete="off" spellcheck="false" class="w-full rounded-[10px] border border-line bg-bg p-2.5 font-mono text-xs text-ink"></textarea>
+        </label>
+        {{else if eq $c.Kind "bing"}}
+        <label class="flex flex-col gap-1.5 text-[13px] font-medium">API key
+          <input type="password" name="credential" required autocomplete="off" spellcheck="false" class="field w-full font-mono">
+        </label>
+        {{else}}
+        <label class="flex flex-col gap-1.5 text-[13px] font-medium">API token
+          <input type="password" name="credential" required autocomplete="off" spellcheck="false" class="field w-full font-mono">
+        </label>
+        <label class="flex flex-col gap-1.5 text-[13px] font-medium">Zone ID
+          <input type="text" name="target" required pattern="[0-9a-f]{32}" value="{{$c.Target}}" autocomplete="off" spellcheck="false" class="field w-full font-mono" aria-describedby="cf-zone-hint">
+          <span id="cf-zone-hint" class="text-xs font-normal text-muted">32 hexadecimal characters, from the zone's Overview page.</span>
+        </label>
+        {{end}}
+        <button type="submit" class="btn-light self-start">{{if eq $c.Source "ui"}}Replace{{else}}Save and connect{{end}}</button>
+      </form>
+    {{end}}
+    </div>
+  </details>
+  {{end}}
+  {{end}}
+
+  <details class="rounded-[10px] border border-hair"{{if and $p.Admin (eq $c.Status "none")}} open{{end}}>
+    <summary class="flex min-h-11 items-center px-3 text-[13px] font-medium">Setup steps</summary>
+    <ol class="m-0 flex list-decimal flex-col gap-2 border-t border-hair py-3 pr-3 pl-8 text-[13px] leading-normal text-muted [&_a]:underline">{{template "int-steps" $c}}</ol>
+  </details>
+
+  {{if and $p.Admin $c.Events}}
+  <details class="rounded-[10px] border border-hair">
+    <summary class="flex min-h-11 items-center px-3 text-[13px] font-medium">History</summary>
+    <ul class="m-0 flex list-none flex-col border-t border-hair p-0">
+      {{range $c.Events}}<li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-rule px-3 py-2 text-[13px] last:border-b-0">
+        <span class="font-mono text-xs text-muted">{{.At}}</span>
+        <span class="font-medium">{{.Action}}</span>
+        <span class="{{if .OK}}text-up{{else}}text-err{{end}}">{{if .OK}}ok{{else}}failed{{if .Code}} · {{.Code}}{{end}}{{end}}</span>
+        {{if .Status}}<span class="font-mono text-xs text-muted">{{.Status}}</span>{{end}}
+        {{if .Detail}}<span class="min-w-0 truncate text-muted">{{.Detail}}</span>{{end}}
+        <span class="ml-auto text-xs text-muted">{{.Actor}}</span>
+      </li>{{end}}
+    </ul>
+  </details>
+  {{end}}
+</section>
+{{end}}
+
+{{define "int-steps"}}
+{{if eq .Kind "google"}}
+<li>In Google Cloud, enable the <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com">Search Console API</a> for a project.</li>
+<li>Under <a href="https://console.cloud.google.com/iam-admin/serviceaccounts">Service accounts</a>, create one (no roles needed), then <em>Keys → Add key → JSON</em>.</li>
+<li>In <a href="https://search.google.com/search-console/users">Search Console → Settings → Users and permissions</a>, add the service account's <code class="font-mono text-xs">client_email</code> as a <em>Restricted</em> user of the property.</li>
+<li>Upload or paste the JSON here, then pick the property: <code class="font-mono text-xs">sc-domain:jorisjonkers.dev</code> or the URL prefix.</li>
+{{else if eq .Kind "bing"}}
+<li>Add and verify the site in <a href="https://www.bing.com/webmasters">Bing Webmaster Tools</a> (importing it from Search Console works too).</li>
+<li>Open <em>Settings (gear) → API access → API Key</em> and generate a key.</li>
+<li>Paste the key here, then pick the site to import.</li>
+{{else if eq .Kind "indexnow"}}
+<li>Generate a key here. It is served at <code class="font-mono text-xs">/&lt;key&gt;.txt</code>, the key location sent with every submission.</li>
+<li>Run <em>Test connection</em> to confirm the key file is reachable from outside.</li>
+<li><em>Notify now</em> submits every Mirror Page. A new Content Release submits its changed pages on startup. <a href="https://www.indexnow.org/">IndexNow</a> shares submissions with Bing, Yandex, Seznam and Naver; Google does not use it.</li>
+{{else}}
+<li>In Cloudflare, open <a href="https://dash.cloudflare.com/profile/api-tokens">My Profile → API Tokens</a> and create a <em>Custom token</em>.</li>
+<li>Give it one permission, <em>Zone → Analytics → Read</em>, limited to <em>Specific zone → jorisjonkers.dev</em>. Nothing else.</li>
+<li>Copy the <em>Zone ID</em> from the zone's Overview page (API section).</li>
+<li>Paste token and zone ID here. <em>Test connection</em> verifies the token, the zone and which breakdowns the plan allows.</li>
+{{end}}
+{{end}}
+
+{{define "int-compare"}}
+<section aria-labelledby="edge-title" class="card flex flex-col gap-4 overflow-hidden px-4 py-5 sm:px-6">
+  <div class="flex flex-col gap-1">
+    <h2 id="edge-title" class="h2">Edge versus origin</h2>
+    <span class="sub">Requests Cloudflare saw for this host against the Hits recorded here, {{.Range}}. Cloudflare counts every request, including static assets and the beacon, and its counts are sampled estimates.</span>
+  </div>
+  <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" tabindex="0" role="region" aria-label="Requests per day, scrolls sideways">
+    <div role="table" aria-label="Requests per day at the edge and at the origin" class="min-w-[560px]">
+      <div role="row" class="thead grid grid-cols-[minmax(0,1fr)_90px_110px_80px_80px_80px] px-0 sm:px-0"><span role="columnheader">Day (UTC)</span><span role="columnheader" class="text-right">Edge</span><span role="columnheader" class="text-right">Edge, pages</span><span role="columnheader" class="text-right">Hits</span><span role="columnheader" class="text-right">AI edge</span><span role="columnheader" class="text-right">AI Hits</span></div>
+      {{range .Days}}<div role="row" class="trow grid grid-cols-[minmax(0,1fr)_90px_110px_80px_80px_80px] px-0 text-[13px] sm:px-0"><span role="cell">{{.Day}}</span><span role="cell" class="text-right font-mono">{{num .Edge}}</span><span role="cell" class="text-right font-mono">{{if .HasComparable}}{{num .EdgeComparable}}{{else}}—{{end}}</span><span role="cell" class="text-right font-mono">{{num .Origin}}</span><span role="cell" class="text-right font-mono">{{if .HasAI}}{{num .EdgeAI}}{{else}}—{{end}}</span><span role="cell" class="text-right font-mono">{{num .OriginAI}}</span></div>{{end}}
+    </div>
+  </div>
+  {{if .HasUA}}
+  <div class="flex flex-col gap-2">
+    <h3 class="m-0 text-[14px] font-semibold">AI agents at the edge and at the origin</h3>
+    <p class="m-0 max-w-[760px] text-[13px] leading-normal text-muted">An agent with edge requests but few or no Hits is stopped before it reaches the mirror, for example by Cloudflare's “Block AI bots”. Hits count only crawlers whose address matched their operator's ranges.{{if .HasStatus}} The edge answered 403 to {{num .Blocked}} requests in this window.{{end}}</p>
+    {{if .Bots}}<div role="table" aria-label="AI agents at the edge and at the origin">
+      <div role="row" class="thead grid grid-cols-[minmax(0,1fr)_48px_40px_60px] sm:grid-cols-[minmax(0,1fr)_72px_72px_96px] px-0 sm:px-0"><span role="columnheader">Agent</span><span role="columnheader" class="text-right">Edge</span><span role="columnheader" class="text-right">Hits</span><span role="columnheader" class="text-right">Not at origin</span></div>
+      {{range .Bots}}<div role="row" class="trow grid grid-cols-[minmax(0,1fr)_48px_40px_60px] sm:grid-cols-[minmax(0,1fr)_72px_72px_96px] px-0 text-[13px] sm:px-0"><span role="cell" class="truncate">{{.Name}}</span><span role="cell" class="text-right font-mono">{{num .Edge}}</span><span role="cell" class="text-right font-mono">{{num .Origin}}</span><span role="cell" class="text-right font-mono {{if .Missing}}text-warn{{else}}text-muted{{end}}">{{num .Missing}}</span></div>{{end}}
+    </div>{{else}}<p class="m-0 text-[13px] text-muted">No AI agents in this window.</p>{{end}}
+  </div>
+  {{else}}<p class="m-0 text-[13px] text-muted">This plan does not break requests down by user agent, so AI agents cannot be compared.</p>{{end}}
+</section>
+{{end}}

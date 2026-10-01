@@ -34,6 +34,18 @@ func (q *Queries) AppVersions(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const latestRelease = `-- name: LatestRelease :one
+SELECT label FROM releases ORDER BY last_seen_at DESC, first_seen_at DESC LIMIT 1
+`
+
+// The release the previous process served: the most recently seen one.
+func (q *Queries) LatestRelease(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, latestRelease)
+	var label string
+	err := row.Scan(&label)
+	return label, err
+}
+
 const listPages = `-- name: ListPages :many
 SELECT release_label, path, page_id, locale, type, title, description, h1, keywords, word_count, content_hash FROM pages ORDER BY release_label, path
 `
@@ -127,6 +139,35 @@ func (q *Queries) PageLastMod(ctx context.Context, releaseLabel string) ([]PageL
 	for rows.Next() {
 		var i PageLastModRow
 		if err := rows.Scan(&i.Path, &i.Since); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const releasePageHashes = `-- name: ReleasePageHashes :many
+SELECT path, content_hash FROM pages WHERE release_label = $1 ORDER BY path
+`
+
+type ReleasePageHashesRow struct {
+	Path        string
+	ContentHash string
+}
+
+func (q *Queries) ReleasePageHashes(ctx context.Context, releaseLabel string) ([]ReleasePageHashesRow, error) {
+	rows, err := q.db.Query(ctx, releasePageHashes, releaseLabel)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReleasePageHashesRow{}
+	for rows.Next() {
+		var i ReleasePageHashesRow
+		if err := rows.Scan(&i.Path, &i.ContentHash); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

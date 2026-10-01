@@ -1,6 +1,7 @@
 /* Stats stylesheet. Built by the Tailwind v4 standalone CLI into web/static/stats.css (task css). */
 @import "tailwindcss" source(none);
 @source "../templates/stats.html";
+@source "../templates/stats-integrations.html";
 @source "../../internal/stats/*.go";
 
 @font-face {
@@ -70,6 +71,10 @@
   --color-warn-bg: #33270f;
   --color-warn: #f2c46b;
   --color-live: #4cc39b;
+  --color-err-bg: #3a1716;
+  --color-err: #f59a90;
+  --color-vault-bg: #16243d;
+  --color-vault: #9dbcf7;
   --color-k-human: #4cc39b;
   --color-k-unconfirmed: #2e7a64;
   --color-k-search: #5b8def;
@@ -207,6 +212,18 @@
 
   .pill-partial {
     @apply rounded-full bg-warn-bg px-2 py-[3px] font-mono text-xs font-medium whitespace-nowrap text-warn;
+  }
+
+  .pill-err {
+    @apply rounded-full bg-err-bg px-2 py-[3px] font-mono text-xs font-medium whitespace-nowrap text-err;
+  }
+
+  .pill-vault {
+    @apply rounded-full bg-vault-bg px-2 py-[3px] font-mono text-xs font-medium whitespace-nowrap text-vault;
+  }
+
+  .btn-danger {
+    @apply inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-err/60 bg-panel px-2.5 font-sans text-xs text-err no-underline hover:border-err hover:bg-err-bg;
   }
 
   .pill-none {

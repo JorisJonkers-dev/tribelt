@@ -15,6 +15,16 @@ sql:
             go_type: time.Time
           - db_type: pg_catalog.timestamptz
             go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: pg_catalog.timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
           - db_type: date
             go_type: time.Time
           - db_type: uuid
