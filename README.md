@@ -105,16 +105,23 @@ with the tribelt.nl crawl, any duplicate title or description, a second H1, an i
 text, or an internal link that goes nowhere. Loading is strict, so a typo in a front matter key
 fails the build instead of silently disappearing.
 
-**Every content change is a new Content Release.** Change `release` in `content/site.yml`:
+**Every release that changes content is a new Content Release.** Before the release PR can merge,
+`release` in `content/site.yml` must carry a label the previous release did not:
 
 ```yaml
 release: { label: v2-longtail-keywords, note: "Product titles lead with the long-tail term" }
 ```
 
-The label is a lowercase slug and must be new; CI (`task release-gate`) fails a change under
-`content/` that keeps the old label. The running release is recorded at startup, stamped on every
-Hit, drawn as a marker on every timeline and compared in *Release compare*. Sitemap `lastmod` is
-the date a page's current text first went live, so unchanged pages keep their date.
+The label is a lowercase slug. Several content PRs may share one label within a release, so a
+content PR does not have to bump it: CI only adds a notice when it changes `content/` while the
+label still equals the latest `vX.Y.Z` tag's. The release PR is where it is enforced. CI on a
+`release-please--*` branch (`task release-gate`, or `task release-gate:release` by hand) fails when
+anything under `content/` changed since the latest `vX.Y.Z` tag and the label did not. The fix is
+a label bump on `main`: release-please (`always-update`) then rebuilds its PR and CI runs again.
+Releases without content changes, and the first release, pass. The running release is recorded at
+startup, stamped on every Hit, drawn as a marker on every timeline and compared in *Release
+compare*. Sitemap `lastmod` is the date a page's current text first went live, so unchanged pages
+keep their date.
 
 ## Environment
 

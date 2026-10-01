@@ -5,7 +5,9 @@
 name: CI
 
 on:
+  # synchronize re-runs the Content Release gate when release-please (App token) updates its PR.
   pull_request:
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
   workflow_dispatch:
@@ -25,7 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # the Content Release gate diffs against the base branch
+          fetch-depth: 0 # the Content Release gate diffs against the base branch and the latest tag
+          fetch-tags: true
 
       - uses: jdx/mise-action@v5
         with:
@@ -63,10 +66,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: task test:visits
 
-      - name: Content changes start a new Content Release
+      # Always runs: the script itself enforces on release-please--* heads and only annotates elsewhere,
+      # so no `if:` can skip the enforcing check and leave Pipeline Complete green.
+      - name: Content Release gate (enforced on the release PR)
         if: ${{ !cancelled() }}
         env:
           BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+          HEAD_REF: ${{ github.head_ref }}
         run: task release-gate
 
       - name: Build
