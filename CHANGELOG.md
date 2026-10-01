@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.3.0...v0.4.0) (2026-10-01)
+
+
+### Features
+
+* **stats:** dark redesign with resource tracking, App Version and release tags ([#9](https://github.com/JorisJonkers-dev/tribelt/issues/9)) ([9c62aef](https://github.com/JorisJonkers-dev/tribelt/commit/9c62aef629c8223488448abd5cedd0f6f3b46a2b))
+
 ## [0.3.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.2.0...v0.3.0) (2026-10-01)
 
 
