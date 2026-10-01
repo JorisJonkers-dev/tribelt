@@ -135,6 +135,16 @@ _Avoid_: CDN hit, edge hit
 An auth-api admin, or a person holding the Tribelt stats service permission.
 Only an admin may change an Integration; the others see it read-only.
 
+**Account**:
+The local record of a Stats Viewer, created at their first sign-in through
+auth-api. auth-api is the only way in and decides the Account's roles.
+_Avoid_: user, login
+
+**Session**:
+One signed-in browser of an Account. Signing out ends this Session only,
+never the person's auth-api session.
+_Avoid_: login session, cookie
+
 ## Relationships
 
 - A **Hit** belongs to exactly one **Mirror Page** (or agent-facing file) and one **Content Release**

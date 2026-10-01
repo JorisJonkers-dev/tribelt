@@ -42,7 +42,7 @@ func TestIntegrationsMigration(t *testing.T) {
 		t.Fatalf("re-running is a no-op: %v", err)
 	}
 	var version int64
-	if err := conn.QueryRowContext(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&version); err != nil || version != 4 {
+	if err := conn.QueryRowContext(ctx, `SELECT max(version_id) FROM goose_db_version`).Scan(&version); err != nil || version < 4 {
 		t.Fatalf("version %d %v", version, err)
 	}
 	ok := func(q string) {

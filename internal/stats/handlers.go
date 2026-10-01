@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/JorisJonkers-dev/tribelt/internal/integrations"
+	"github.com/JorisJonkers-dev/tribelt/internal/platform/oidc"
 	"github.com/JorisJonkers-dev/tribelt/internal/platform/pg/queries"
 	"github.com/JorisJonkers-dev/tribelt/internal/visits"
 )
@@ -47,6 +48,8 @@ type Service struct {
 	// Session identifies the session a CSRF token is bound to; CSRFKey signs the tokens.
 	Session func(r *http.Request) string
 	CSRFKey []byte
+	// Account returns the signed-in viewer's local account and open sessions.
+	Account func(r *http.Request) (oidc.Account, []oidc.Session, bool)
 	tmpl    *template.Template
 }
 
@@ -102,7 +105,7 @@ type releaseSide struct {
 
 // Init parses the stats templates.
 func (s *Service) Init(templates fs.FS) error {
-	t, err := template.New("stats.html").Funcs(funcs()).ParseFS(templates, "stats.html", "stats-integrations.html")
+	t, err := template.New("stats.html").Funcs(funcs()).ParseFS(templates, "stats.html", "stats-integrations.html", "stats-account.html")
 	if err != nil {
 		return err
 	}
@@ -130,6 +133,9 @@ func (s *Service) Routes(mux *http.ServeMux, guard func(http.Handler) http.Handl
 	if s.Integrations != nil {
 		h("GET /stats/integrations", s.integrationsView)
 		h("POST /stats/integrations/{kind}/{action}", s.integrationsAction)
+	}
+	if s.Account != nil {
+		h("GET /stats/account", s.accountView)
 	}
 	h("GET /stats/chart/{name}", s.chartSVG)
 	h("GET /stats/export.sqlite", s.exportSQLite)

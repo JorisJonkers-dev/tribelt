@@ -1,0 +1,48 @@
+{{define "account"}}{{template "top" .}}{{with .Data}}
+{{template "heading" (heading "Your account" "Your tribelt account is created from your auth-api sign-in. auth-api decides what you may do; tribelt re-reads your roles from it at least every few seconds.")}}
+<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+  <section aria-labelledby="acc-title" class="flex flex-col gap-4 rounded-[14px] border border-line bg-panel p-6">
+    <div class="flex items-center justify-between gap-3">
+      <h2 id="acc-title" class="m-0 text-[17px] font-semibold">{{.Account.Name}}</h2>
+      {{if .Account.Admin}}<span class="pill-ok">Administrator</span>{{else}}<span class="pill-vault">Stats Viewer</span>{{end}}
+    </div>
+    <dl class="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2.5 text-[13px]">
+      <dt class="text-muted">E-mail</dt><dd class="m-0 truncate">{{if .Account.Email}}{{.Account.Email}}{{else}}not shared{{end}}</dd>
+      <dt class="text-muted">auth-api id</dt><dd class="m-0 truncate font-mono text-[12px]">{{.Account.Sub}}</dd>
+      <dt class="text-muted">First sign-in</dt><dd class="m-0">{{.Account.CreatedAt.Format "2 Jan 2006 15:04"}}</dd>
+      <dt class="text-muted">Last sign-in</dt><dd class="m-0">{{.Account.LastLoginAt.Format "2 Jan 2006 15:04"}}</dd>
+      <dt class="text-muted">Roles</dt>
+      <dd class="m-0 flex flex-wrap gap-1.5">{{range .Account.Roles}}<span class="rounded-md bg-track px-2 py-0.5 font-mono text-[11px]">{{.}}</span>{{else}}<span class="text-muted">none</span>{{end}}</dd>
+    </dl>
+    <p class="m-0 rounded-[10px] border border-line bg-raised px-3.5 py-3 text-[13px] leading-relaxed text-muted">
+      Roles come from auth-api and are re-checked at least every {{.FreshFor}}, and right before any change you make here.
+      A permission granted or removed in auth-api applies here within that time; removing access ends your tribelt sessions.
+    </p>
+  </section>
+
+  <section aria-labelledby="sess-title" class="flex flex-col gap-4 rounded-[14px] border border-line bg-panel p-6">
+    <div class="flex flex-col gap-1">
+      <h2 id="sess-title" class="m-0 text-[17px] font-semibold">Signed-in tribelt sessions</h2>
+      <span class="text-[13px] text-muted">Signing out here ends tribelt sessions only. You stay signed in to auth.jorisjonkers.dev and every other app.</span>
+    </div>
+    <ul class="m-0 flex list-none flex-col p-0">
+      {{range .Sessions}}
+      <li class="flex flex-wrap items-center justify-between gap-2 border-b border-hair py-3 text-[13px]">
+        <span class="flex items-center gap-2 font-medium">{{.Device}}{{if .Current}}<span class="pill-ok">This session</span>{{end}}</span>
+        <span class="text-muted">since {{.Started.Format "2 Jan 15:04"}} · active {{.LastSeen.Format "2 Jan 15:04"}} · ends {{.Expires.Format "2 Jan"}}</span>
+      </li>
+      {{end}}
+    </ul>
+    <div class="flex flex-wrap gap-2.5">
+      <form method="post" action="/auth/logout" class="m-0">
+        <button type="submit" class="min-h-11 cursor-pointer rounded-[10px] border border-strong bg-panel px-4 font-sans text-[13px] font-medium text-ink hover:border-muted">Sign out of this session</button>
+      </form>
+      {{if gt (len .Sessions) 1}}
+      <form method="post" action="/auth/logout-all" class="m-0">
+        <button type="submit" class="min-h-11 cursor-pointer rounded-[10px] border border-strong bg-panel px-4 font-sans text-[13px] font-medium text-ink hover:border-muted">Sign out of all {{len .Sessions}} tribelt sessions</button>
+      </form>
+      {{end}}
+    </div>
+  </section>
+</div>
+{{end}}{{template "bottom" .}}{{end}}
