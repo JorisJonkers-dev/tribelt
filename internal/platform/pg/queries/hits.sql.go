@@ -37,7 +37,7 @@ func (q *Queries) ConfirmBeacon(ctx context.Context, arg ConfirmBeaconParams) (i
 }
 
 const getHit = `-- name: GetHit :one
-SELECT id, ts, path, page_id, locale, release_label, format, status, visitor_kind, bot_name, verified, arrival_channel, referrer_host, referrer_name, utm_source, utm_medium, utm_campaign, utm_term, utm_content, country, user_agent, visitor_id, daily_hash, internal, beacon_confirmed, engaged_ms FROM hits WHERE id = $1
+SELECT id, ts, path, page_id, locale, release_label, format, status, visitor_kind, bot_name, verified, arrival_channel, referrer_host, referrer_name, utm_source, utm_medium, utm_campaign, utm_term, utm_content, country, user_agent, visitor_id, daily_hash, internal, beacon_confirmed, engaged_ms, resource, app_version FROM hits WHERE id = $1
 `
 
 func (q *Queries) GetHit(ctx context.Context, id uuid.UUID) (Hit, error) {
@@ -70,6 +70,8 @@ func (q *Queries) GetHit(ctx context.Context, id uuid.UUID) (Hit, error) {
 		&i.Internal,
 		&i.BeaconConfirmed,
 		&i.EngagedMs,
+		&i.Resource,
+		&i.AppVersion,
 	)
 	return i, err
 }
@@ -78,11 +80,11 @@ const insertHit = `-- name: InsertHit :exec
 INSERT INTO hits (
     id, ts, path, page_id, locale, release_label, format, status, visitor_kind, bot_name, verified,
     arrival_channel, referrer_host, referrer_name, utm_source, utm_medium, utm_campaign, utm_term, utm_content,
-    country, user_agent, visitor_id, daily_hash, internal
+    country, user_agent, visitor_id, daily_hash, internal, resource, app_version
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
     $12, $13, $14, $15, $16, $17, $18, $19,
-    $20, $21, $22, $23, $24
+    $20, $21, $22, $23, $24, $25, $26
 )
 `
 
@@ -111,6 +113,8 @@ type InsertHitParams struct {
 	VisitorID      *string
 	DailyHash      string
 	Internal       bool
+	Resource       string
+	AppVersion     string
 }
 
 func (q *Queries) InsertHit(ctx context.Context, arg InsertHitParams) error {
@@ -139,6 +143,8 @@ func (q *Queries) InsertHit(ctx context.Context, arg InsertHitParams) error {
 		arg.VisitorID,
 		arg.DailyHash,
 		arg.Internal,
+		arg.Resource,
+		arg.AppVersion,
 	)
 	return err
 }
@@ -146,10 +152,10 @@ func (q *Queries) InsertHit(ctx context.Context, arg InsertHitParams) error {
 const insertOutboundClick = `-- name: InsertOutboundClick :exec
 INSERT INTO outbound_clicks (
     id, ts, from_path, page_id, locale, release_label, target, visitor_kind, bot_name, verified,
-    visitor_id, daily_hash, internal, country
+    visitor_id, daily_hash, internal, country, app_version
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14
+    $11, $12, $13, $14, $15
 )
 `
 
@@ -168,6 +174,7 @@ type InsertOutboundClickParams struct {
 	DailyHash    string
 	Internal     bool
 	Country      *string
+	AppVersion   string
 }
 
 func (q *Queries) InsertOutboundClick(ctx context.Context, arg InsertOutboundClickParams) error {
@@ -186,6 +193,7 @@ func (q *Queries) InsertOutboundClick(ctx context.Context, arg InsertOutboundCli
 		arg.DailyHash,
 		arg.Internal,
 		arg.Country,
+		arg.AppVersion,
 	)
 	return err
 }

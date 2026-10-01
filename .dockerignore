@@ -9,3 +9,4 @@ visits.out
 **/*_test.go
 **/testdata
 web/static/site.css
+web/static/stats.css

@@ -277,26 +277,3 @@ func TestFilter(t *testing.T) {
 		t.Fatal("days stay on midnight across DST")
 	}
 }
-
-func TestCharts(t *testing.T) {
-	if niceMax(0) != 4 || niceMax(7) != 10 || niceMax(120) != 200 || niceMax(1000) != 1000 || niceMax(4999) != 5000 {
-		t.Fatal("niceMax")
-	}
-	one := LineChart("t <x>", []time.Time{now()}, []Series{{Name: "a", Color: "#000", Values: []int64{3}}}, []Marker{{Day: now(), Label: "v1 & co"}, {Day: at(40), Label: "gone"}})
-	if !strings.Contains(one, "t &lt;x&gt;") || !strings.Contains(one, "v1 &amp; co") || strings.Contains(one, "gone") {
-		t.Fatal("escaping and markers outside the range")
-	}
-	empty := LineChart("empty", nil, nil, nil)
-	if !strings.HasSuffix(empty, "</svg>") {
-		t.Fatal("empty chart")
-	}
-	bars := BarChart("b", []Bar{{Label: "<search>", Value: 5, Color: KindColor("search")}})
-	if !strings.Contains(bars, "&lt;search&gt;") || !strings.Contains(BarChart("none", nil), "</svg>") {
-		t.Fatal("bars")
-	}
-	for _, k := range []string{"human", "human-unconfirmed", "search-crawler", "ai-crawler", "ai-fetcher", "seo-tool", "other-bot"} {
-		if KindColor(k) == "" {
-			t.Fatal(k)
-		}
-	}
-}

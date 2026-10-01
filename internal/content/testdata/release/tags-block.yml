@@ -1,0 +1,6 @@
+release:
+  label: v2-longtail-keywords
+  note: "Product titles lead with the long-tail term"
+  tags:
+    - longtail-keywords
+    - faq-schema

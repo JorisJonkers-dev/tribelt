@@ -10,6 +10,30 @@ import (
 	"time"
 )
 
+const appVersions = `-- name: AppVersions :many
+SELECT DISTINCT unnest(app_versions)::text AS app_version FROM releases ORDER BY 1
+`
+
+func (q *Queries) AppVersions(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, appVersions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var app_version string
+		if err := rows.Scan(&app_version); err != nil {
+			return nil, err
+		}
+		items = append(items, app_version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPages = `-- name: ListPages :many
 SELECT release_label, path, page_id, locale, type, title, description, h1, keywords, word_count, content_hash FROM pages ORDER BY release_label, path
 `
@@ -47,7 +71,7 @@ func (q *Queries) ListPages(ctx context.Context) ([]Page, error) {
 }
 
 const listReleases = `-- name: ListReleases :many
-SELECT label, note, content_hash, first_seen_at, last_seen_at FROM releases ORDER BY first_seen_at, label
+SELECT label, note, content_hash, first_seen_at, last_seen_at, app_version, app_versions, tags FROM releases ORDER BY first_seen_at, label
 `
 
 func (q *Queries) ListReleases(ctx context.Context) ([]Release, error) {
@@ -65,6 +89,9 @@ func (q *Queries) ListReleases(ctx context.Context) ([]Release, error) {
 			&i.ContentHash,
 			&i.FirstSeenAt,
 			&i.LastSeenAt,
+			&i.AppVersion,
+			&i.AppVersions,
+			&i.Tags,
 		); err != nil {
 			return nil, err
 		}
@@ -103,6 +130,30 @@ func (q *Queries) PageLastMod(ctx context.Context, releaseLabel string) ([]PageL
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const releaseTags = `-- name: ReleaseTags :many
+SELECT DISTINCT unnest(tags)::text AS tag FROM releases ORDER BY 1
+`
+
+func (q *Queries) ReleaseTags(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, releaseTags)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, err
+		}
+		items = append(items, tag)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -151,10 +202,15 @@ func (q *Queries) UpsertPage(ctx context.Context, arg UpsertPageParams) error {
 }
 
 const upsertRelease = `-- name: UpsertRelease :one
-INSERT INTO releases (label, note, content_hash)
-VALUES ($1, $2, $3)
+INSERT INTO releases (label, note, content_hash, app_version, app_versions, tags)
+VALUES ($1, $2, $3, $4::text, ARRAY[$4::text], $5::text [])
 ON CONFLICT (label) DO UPDATE
-SET note = excluded.note, content_hash = excluded.content_hash, last_seen_at = now()
+SET note = excluded.note, content_hash = excluded.content_hash, tags = excluded.tags, last_seen_at = now(),
+    app_version = CASE WHEN releases.app_version = '' THEN excluded.app_version ELSE releases.app_version END,
+    app_versions = CASE
+        WHEN excluded.app_version = ANY (releases.app_versions) THEN releases.app_versions
+        ELSE releases.app_versions || excluded.app_version
+    END
 RETURNING first_seen_at
 `
 
@@ -162,10 +218,19 @@ type UpsertReleaseParams struct {
 	Label       string
 	Note        string
 	ContentHash string
+	AppVersion  string
+	Tags        []string
 }
 
+// app_version is the build that first published the release; app_versions every build that served it.
 func (q *Queries) UpsertRelease(ctx context.Context, arg UpsertReleaseParams) (time.Time, error) {
-	row := q.db.QueryRow(ctx, upsertRelease, arg.Label, arg.Note, arg.ContentHash)
+	row := q.db.QueryRow(ctx, upsertRelease,
+		arg.Label,
+		arg.Note,
+		arg.ContentHash,
+		arg.AppVersion,
+		arg.Tags,
+	)
 	var first_seen_at time.Time
 	err := row.Scan(&first_seen_at)
 	return first_seen_at, err

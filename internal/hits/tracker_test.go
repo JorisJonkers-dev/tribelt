@@ -65,7 +65,7 @@ func newTracker(t *testing.T) *Tracker {
 	rec := NewRecorder(&memWriter{}, slog.New(slog.DiscardHandler), 100)
 	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
 	return &Tracker{
-		Recorder: rec, Ranges: ranges, Hasher: visits.NewDailyHasher([]byte("k")), Release: "v1-test", Host: "mirror.test",
+		Recorder: rec, Ranges: ranges, Hasher: visits.NewDailyHasher([]byte("k")), Release: "v1-test", AppVersion: "0.3.0", Host: "mirror.test",
 		SecureCookies: true, Now: func() time.Time { return now }, Rand: bytes.NewReader(bytes.Repeat([]byte{7}, 1024)),
 		Internal: func(r *http.Request) bool { return r.Header.Get("X-Test-Internal") == "1" },
 		Resolve: func(p string) (string, string, bool) {

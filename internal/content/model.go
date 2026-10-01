@@ -17,10 +17,11 @@ type Site struct {
 	Locales  map[string]*Locale `yaml:"locales"`
 }
 
-// Release is the current Content Release.
+// Release is the current Content Release. Tags are optional free-form experiment labels.
 type Release struct {
-	Label string `yaml:"label"`
-	Note  string `yaml:"note"`
+	Label string   `yaml:"label"`
+	Note  string   `yaml:"note"`
+	Tags  []string `yaml:"tags"`
 }
 
 // Org feeds the Organization JSON-LD.

@@ -58,6 +58,7 @@ func (c *Content) validateSite(p *problems) {
 	if strings.TrimSpace(s.Release.Note) == "" {
 		p.add("site.yml: release.note is required")
 	}
+	validateTags(p, s.Release.Tags)
 	if u, err := url.Parse(s.BaseURL); err != nil || u.Scheme == "" || u.Host == "" || strings.HasSuffix(s.BaseURL, "/") {
 		p.add("site.yml: baseUrl %q must be an absolute URL without trailing slash", s.BaseURL)
 	}
@@ -71,6 +72,20 @@ func (c *Content) validateSite(p *problems) {
 		if !slices.Contains(LocaleOrder(), code) {
 			p.add("site.yml: unknown locale %s", code)
 		}
+	}
+}
+
+// validateTags checks the optional experiment tags of a Content Release.
+func validateTags(p *problems, tags []string) {
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		if !idPattern.MatchString(tag) || len(tag) > 40 {
+			p.add("site.yml: release tag %q must be a lowercase slug like faq-schema", tag)
+		}
+		if seen[tag] {
+			p.add("site.yml: release tag %q is listed twice", tag)
+		}
+		seen[tag] = true
 	}
 }
 

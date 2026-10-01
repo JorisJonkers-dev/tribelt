@@ -42,6 +42,15 @@ func URL(t testing.TB) string {
 	return withDatabase(adminURL, name)
 }
 
+// EmptyURL returns the connection string of a new database without any migration applied.
+func EmptyURL(t testing.TB) string {
+	t.Helper()
+	URL(t)
+	name := "e_" + randomSuffix()
+	exec(t, adminURL, "CREATE DATABASE "+name)
+	return withDatabase(adminURL, name)
+}
+
 func start() {
 	ctx := context.Background()
 	c, err := postgres.Run(ctx, "postgres:16-alpine",

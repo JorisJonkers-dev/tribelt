@@ -25,7 +25,9 @@ type Tracker struct {
 	// Internal reports whether the request comes from a signed-in Stats Viewer.
 	Internal func(r *http.Request) bool
 	Release  string
-	Host     string
+	// AppVersion is the build serving the request, stamped on every Hit next to the release label.
+	AppVersion string
+	Host       string
 	// Resolve maps a Mirror Page path to its id and locale.
 	Resolve func(path string) (id, locale string, ok bool)
 	// SecureCookies is false only for plain-HTTP local development.
@@ -135,28 +137,36 @@ func (s *statusWriter) Write(b []byte) (int, error) {
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 // Middleware records one Hit per request after the handler has answered.
-func (t *Tracker) Middleware(next http.Handler) http.Handler {
+func (t *Tracker) Middleware(next http.Handler) http.Handler { return t.track(next, "html", true) }
+
+// Images records image requests as Hits of format img; they never issue a Visitor ID, so cached
+// responses carry no Set-Cookie.
+func (t *Tracker) Images(next http.Handler) http.Handler { return t.track(next, "img", false) }
+
+func (t *Tracker) track(next http.Handler, format string, mayIssue bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		now := t.Now()
-		info := &Info{HitID: newID(), Format: "html"}
-		id := t.identify(w, r, now, true)
+		info := &Info{HitID: newID(), Format: format}
+		id := t.identify(w, r, now, mayIssue)
 		sw := &statusWriter{ResponseWriter: w}
 		next.ServeHTTP(sw, r.WithContext(context.WithValue(r.Context(), infoKey{}, info)))
-		if info.Skip {
-			return
-		}
 		if sw.status == 0 {
 			sw.status = http.StatusOK
 		}
-		t.Recorder.Enqueue(Op{Hit: t.hit(r, now, info, id, sw.status)})
+		res, ok := visits.ClassifyResource(r.URL.Path, info.Format, sw.status)
+		if info.Skip || !ok {
+			return
+		}
+		t.Recorder.Enqueue(Op{Hit: t.hit(r, now, info, id, sw.status, res)})
 	})
 }
 
-func (t *Tracker) hit(r *http.Request, now time.Time, info *Info, id identity, status int) *queries.InsertHitParams {
+func (t *Tracker) hit(r *http.Request, now time.Time, info *Info, id identity, status int, res visits.Resource) *queries.InsertHitParams {
 	arr := visits.ClassifyArrival(r.Referer(), r.URL.Query(), t.Host)
 	h := &queries.InsertHitParams{
 		ID: info.HitID, Ts: now, Path: visits.Clean(r.URL.Path, 1024), PageID: ptr(info.PageID), Locale: ptr(info.Locale),
-		ReleaseLabel: t.Release, Format: info.Format, Status: int64(status), VisitorKind: string(id.cls.Kind),
+		ReleaseLabel: t.Release, AppVersion: t.AppVersion, Resource: string(res),
+		Format: info.Format, Status: int64(status), VisitorKind: string(id.cls.Kind),
 		BotName: ptr(id.cls.BotName), ReferrerHost: ptr(arr.ReferrerHost), UtmSource: ptr(arr.UTM.Source),
 		UtmMedium: ptr(arr.UTM.Medium), UtmCampaign: ptr(arr.UTM.Campaign), UtmTerm: ptr(arr.UTM.Term), UtmContent: ptr(arr.UTM.Content),
 		Country: id.country, UserAgent: id.ua, VisitorID: id.visitor, DailyHash: id.daily, Internal: id.internal,
@@ -199,7 +209,7 @@ func (t *Tracker) Go(allowed func(string) bool) http.HandlerFunc {
 		id := t.identify(w, r, now, false)
 		from := visits.Clean(r.URL.Query().Get("from"), 1024)
 		click := &queries.InsertOutboundClickParams{
-			ID: newID(), Ts: now, FromPath: from, ReleaseLabel: t.Release, Target: visits.Clean(to, 2048),
+			ID: newID(), Ts: now, FromPath: from, ReleaseLabel: t.Release, AppVersion: t.AppVersion, Target: visits.Clean(to, 2048),
 			VisitorKind: string(id.cls.Kind), BotName: ptr(id.cls.BotName), VisitorID: id.visitor, DailyHash: id.daily,
 			Internal: id.internal, Country: id.country,
 		}

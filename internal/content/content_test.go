@@ -158,6 +158,13 @@ func TestValidationFailsFast(t *testing.T) {
 		}, "cta needs"},
 		{"bad release label", func(m fstest.MapFS) { edit(m, "site.yml", "label: v1-fixture", "label: V1 Fixture") }, "release.label"},
 		{"missing release note", func(m fstest.MapFS) { edit(m, "site.yml", `note: "Fixture release for tests"`, `note: ""`) }, "release.note is required"},
+		{"bad release tag", func(m fstest.MapFS) {
+			edit(m, "site.yml", `note: "Fixture release for tests"`, `note: "n", tags: [FAQ Schema]`)
+		}, `release tag "FAQ Schema" must be a lowercase slug`},
+		{"duplicate release tag", func(m fstest.MapFS) {
+			edit(m, "site.yml", `note: "Fixture release for tests"`, `note: "n", tags: [faq-schema, faq-schema]`)
+		}, `release tag "faq-schema" is listed twice`},
+		{"unknown release field", func(m fstest.MapFS) { edit(m, "site.yml", `note: "Fixture release for tests"`, `note: "n", tag: x`) }, "field tag not found"},
 		{"bad base url", func(m fstest.MapFS) {
 			edit(m, "site.yml", "baseUrl: https://mirror.test", "baseUrl: https://mirror.test/")
 		}, "baseUrl"},

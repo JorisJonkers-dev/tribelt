@@ -26,7 +26,7 @@ func pool(t *testing.T) *pgxpool.Pool {
 func hit(kind, format string) *queries.InsertHitParams {
 	return &queries.InsertHitParams{
 		ID: uuid.New(), Ts: time.Now(), Path: "/", ReleaseLabel: "v1", Format: format, Status: 200,
-		VisitorKind: kind, UserAgent: "ua", DailyHash: "d",
+		VisitorKind: kind, UserAgent: "ua", DailyHash: "d", Resource: "page", AppVersion: "0.3.0",
 	}
 }
 

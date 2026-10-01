@@ -11,7 +11,7 @@ import (
 )
 
 const listOutboundClicks = `-- name: ListOutboundClicks :many
-SELECT id, ts, from_path, page_id, locale, release_label, target, visitor_kind, bot_name, verified, visitor_id, daily_hash, internal, country FROM outbound_clicks ORDER BY ts
+SELECT id, ts, from_path, page_id, locale, release_label, target, visitor_kind, bot_name, verified, visitor_id, daily_hash, internal, country, app_version FROM outbound_clicks ORDER BY ts
 `
 
 func (q *Queries) ListOutboundClicks(ctx context.Context) ([]OutboundClick, error) {
@@ -38,6 +38,7 @@ func (q *Queries) ListOutboundClicks(ctx context.Context) ([]OutboundClick, erro
 			&i.DailyHash,
 			&i.Internal,
 			&i.Country,
+			&i.AppVersion,
 		); err != nil {
 			return nil, err
 		}

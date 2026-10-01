@@ -26,10 +26,10 @@ type ExportSources interface {
 
 func exportSchema() []string {
 	return []string{
-		`CREATE TABLE releases (label TEXT PRIMARY KEY, note TEXT, first_seen_at TEXT, last_seen_at TEXT)`,
+		`CREATE TABLE releases (label TEXT PRIMARY KEY, note TEXT, first_seen_at TEXT, last_seen_at TEXT, app_version TEXT, app_versions TEXT, tags TEXT)`,
 		`CREATE TABLE pages (release_label TEXT, path TEXT, page_id TEXT, locale TEXT, type TEXT, title TEXT, description TEXT, h1 TEXT, keywords TEXT, word_count INTEGER, content_hash TEXT, PRIMARY KEY (release_label, path))`,
-		`CREATE TABLE hits (id TEXT PRIMARY KEY, ts TEXT, day TEXT, path TEXT, page_id TEXT, locale TEXT, release_label TEXT, format TEXT, status INTEGER, visitor_kind TEXT, bot_name TEXT, verified INTEGER, arrival_channel TEXT, referrer_host TEXT, referrer_name TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_term TEXT, utm_content TEXT, country TEXT, user_agent TEXT, visitor TEXT, daily_visitor TEXT, internal INTEGER, beacon_confirmed INTEGER, engaged_ms INTEGER)`,
-		`CREATE TABLE outbound_clicks (id TEXT PRIMARY KEY, ts TEXT, from_path TEXT, page_id TEXT, locale TEXT, release_label TEXT, target TEXT, visitor_kind TEXT, bot_name TEXT, verified INTEGER, visitor TEXT, daily_visitor TEXT, internal INTEGER, country TEXT)`,
+		`CREATE TABLE hits (id TEXT PRIMARY KEY, ts TEXT, day TEXT, path TEXT, page_id TEXT, locale TEXT, release_label TEXT, format TEXT, status INTEGER, visitor_kind TEXT, bot_name TEXT, verified INTEGER, arrival_channel TEXT, referrer_host TEXT, referrer_name TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_term TEXT, utm_content TEXT, country TEXT, user_agent TEXT, visitor TEXT, daily_visitor TEXT, internal INTEGER, beacon_confirmed INTEGER, engaged_ms INTEGER, resource TEXT, app_version TEXT)`,
+		`CREATE TABLE outbound_clicks (id TEXT PRIMARY KEY, ts TEXT, from_path TEXT, page_id TEXT, locale TEXT, release_label TEXT, target TEXT, visitor_kind TEXT, bot_name TEXT, verified INTEGER, visitor TEXT, daily_visitor TEXT, internal INTEGER, country TEXT, app_version TEXT)`,
 		`CREATE TABLE search_performance (source TEXT, day TEXT, page TEXT, path TEXT, query TEXT, clicks INTEGER, impressions INTEGER, ctr REAL, position REAL, PRIMARY KEY (source, day, page, query))`,
 		`CREATE INDEX hits_day ON hits (day)`,
 		`CREATE VIEW about AS SELECT 'Anonymised export of the Tribelt mirror. Visitor IDs and Daily Visitor hashes are replaced by per-export pseudonyms; human user-agents are reduced to the browser family.' AS note`,
@@ -130,7 +130,7 @@ func fillExport(ctx context.Context, tx *sql.Tx, src ExportSources, db DB, now t
 		return err
 	}
 	for _, r := range rels {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO releases VALUES (?, ?, ?, ?)`, r.Label, r.Note, r.FirstSeenAt.UTC().Format(time.RFC3339), r.LastSeenAt.UTC().Format(time.RFC3339)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO releases VALUES (?, ?, ?, ?, ?, ?, ?)`, r.Label, r.Note, r.FirstSeenAt.UTC().Format(time.RFC3339), r.LastSeenAt.UTC().Format(time.RFC3339), r.AppVersion, strings.Join(r.AppVersions, " "), strings.Join(r.Tags, " ")); err != nil {
 			return err
 		}
 	}
@@ -158,11 +158,11 @@ func fillExport(ctx context.Context, tx *sql.Tx, src ExportSources, db DB, now t
 		return err
 	}
 	for _, c := range clicks {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO outbound_clicks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, c.ID.String(), c.Ts.UTC().Format(time.RFC3339), c.FromPath, nullable(c.PageID), nullable(c.Locale), c.ReleaseLabel, c.Target, c.VisitorKind, nullable(c.BotName), nullable(c.Verified), visitors.of(c.VisitorID), daily.of(&c.DailyHash), c.Internal, nullable(c.Country)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO outbound_clicks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, c.ID.String(), c.Ts.UTC().Format(time.RFC3339), c.FromPath, nullable(c.PageID), nullable(c.Locale), c.ReleaseLabel, c.Target, c.VisitorKind, nullable(c.BotName), nullable(c.Verified), visitors.of(c.VisitorID), daily.of(&c.DailyHash), c.Internal, nullable(c.Country), c.AppVersion); err != nil {
 			return err
 		}
 	}
-	insert, err := tx.PrepareContext(ctx, `INSERT INTO hits VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	insert, err := tx.PrepareContext(ctx, `INSERT INTO hits VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func fillExport(ctx context.Context, tx *sql.Tx, src ExportSources, db DB, now t
 			nullable(h.PageID), nullable(h.Locale), h.ReleaseLabel, h.Format, h.Status, h.VisitorKind, nullable(h.BotName), nullable(h.Verified),
 			nullable(h.ArrivalChannel), nullable(h.ReferrerHost), nullable(h.ReferrerName), nullable(h.UtmSource), nullable(h.UtmMedium),
 			nullable(h.UtmCampaign), nullable(h.UtmTerm), nullable(h.UtmContent), nullable(h.Country), ua, visitors.of(h.VisitorID),
-			daily.of(&h.DailyHash), h.Internal, h.BeaconConfirmed, nullable(h.EngagedMs))
+			daily.of(&h.DailyHash), h.Internal, h.BeaconConfirmed, nullable(h.EngagedMs), h.Resource, h.AppVersion)
 		return err
 	})
 }
