@@ -25,8 +25,9 @@ this file stays a pointer. Add repo-specific guidance below.
 ## This repository
 
 - `task check` is what CI runs; `Pipeline Complete` is the only required check.
-- Every change under `content/` needs a new release label in `content/site.yml`
-  (`task release-gate`), and a `feat(content):` / `fix(content):` title so
-  release-please tags an image that carries it.
+- A release that changes `content/` needs a new release label in `content/site.yml`:
+  the release PR fails without one (`task release-gate:release`); content PRs only
+  get a notice and may share a label. Title them `feat(content):` / `fix(content):`
+  so release-please tags an image that carries them.
 - Releases: release-please opens the release PR; merging it tags `vX.Y.Z`, which
   triggers `publish.yml`. Never tag by hand.

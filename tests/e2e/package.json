@@ -1,7 +1,7 @@
 {
   "name": "tribelt-e2e",
   "private": true,
-  "description": "One Playwright smoke test: a real browser load confirms its Hit through the beacon.",
+  "description": "Playwright: a real browser load confirms its Hit through the beacon; the notice pill stays dismissed.",
   "scripts": {
     "test": "playwright test"
   },

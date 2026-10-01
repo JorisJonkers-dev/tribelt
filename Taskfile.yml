@@ -75,8 +75,12 @@ tasks:
         awk -v t="$total" 'BEGIN { exit !(t >= 100) }'
 
   release-gate:
-    desc: Fail if content/ changed without a new Content Release label (BASE_REF, default origin/main)
+    desc: Content Release gate; enforcing on a release-please--* HEAD_REF, a notice otherwise (BASE_REF, default origin/main)
     cmd: scripts/check-content-release.sh {{.CLI_ARGS}}
+
+  release-gate:release:
+    desc: Fail if content/ changed since the latest vX.Y.Z tag without a new Content Release label
+    cmd: scripts/check-content-release.sh release
 
   build:
     desc: Build the service binary
@@ -126,6 +130,6 @@ tasks:
     cmd: go run ./cmd/{{.APP}} serve
 
   e2e:
-    desc: Playwright beacon smoke test (starts Postgres and the built binary)
+    desc: Playwright beacon and notice-pill tests (starts Postgres and the built binary)
     deps: [db, build]
     cmd: scripts/e2e.sh

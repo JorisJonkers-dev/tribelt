@@ -246,3 +246,25 @@ func TestHeaderButtonFollowsSession(t *testing.T) {
 		t.Fatal("without a gate every visitor is signed out")
 	}
 }
+
+// TestPageAssetsCacheForever: the notice script and stylesheet a page links to are served immutable
+// under their hashed URL, and briefly without it.
+func TestPageAssetsCacheForever(t *testing.T) {
+	b := built(t)
+	rec, _ := serve(&Handler{Built: b}, "GET", "/", nil)
+	page := rec.Body.String()
+	assets := Assets(b)
+	for path, ctype := range map[string]string{"/static/notice.js": "text/javascript; charset=utf-8", "/static/site.css": "text/css; charset=utf-8"} {
+		versioned := b.AssetURL(path)
+		if versioned == path || !strings.Contains(page, `="`+versioned+`"`) {
+			t.Fatalf("page does not link %s by its hashed URL", path)
+		}
+		for target, cache := range map[string]string{versioned: "public, max-age=31536000, immutable", path: "public, max-age=86400"} {
+			r := httptest.NewRecorder()
+			assets.ServeHTTP(r, httptest.NewRequest("GET", target, nil))
+			if r.Code != 200 || r.Header().Get("Content-Type") != ctype || r.Header().Get("Cache-Control") != cache || r.Header().Get("ETag") == "" {
+				t.Fatalf("%s: %d %v", target, r.Code, r.Header())
+			}
+		}
+	}
+}

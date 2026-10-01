@@ -86,6 +86,7 @@ type builder struct {
 	fonts  []string
 	css    string
 	beacon string
+	notice string
 }
 
 // Build renders every page, twin, agent file and 404 page into memory.
@@ -214,6 +215,7 @@ func (b *builder) loadAssets() error {
 	b.versionCSSURLs("/static/site.css")
 	b.css = b.versioned("/static/site.css")
 	b.beacon = b.versioned("/static/beacon.js")
+	b.notice = b.versioned("/static/notice.js")
 	for _, f := range []string{"/static/fonts/outfit.woff2", "/static/fonts/geist-500.woff2"} {
 		if b.assets[f] != nil {
 			b.fonts = append(b.fonts, b.versioned(f))

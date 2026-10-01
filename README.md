@@ -41,7 +41,7 @@ Tooling comes from [mise](https://mise.jdx.dev): `mise install` once, then every
 task dev          # compose Postgres on :5433 + the site on :8080, stats open via DEV_AUTH_BYPASS=1
 task check        # what CI runs: fmt, lint (golangci, squawk, actionlint), sqlc drift, vet,
                   # race tests (testcontainers Postgres), coverage gates, release gate, build, gitleaks
-task e2e          # Playwright: a real page view's beacon confirms its Hit
+task e2e          # Playwright: a page view's beacon confirms its Hit; a dismissed notice pill stays gone
 task css          # the public stylesheet: Tailwind standalone CLI, web/css -> web/static/site.css
 task gen          # sqlc after editing db/queries or db/migrations
 task update-ranges  # refresh the bundled crawler IP ranges
@@ -66,7 +66,7 @@ open http://localhost:8080/stats
 
 The public pages follow tribelt.nl's look (colours, layout rhythm, nav, heroes, cards, footer)
 with deliberate differences: a sticky bar on every page saying this is a student test site and
-linking to the Official Page, no forms (quote, contact and apply are tracked `/go` links), no
+linking to the Official Page, a floating notice pill saying the same, no forms (quote, contact and apply are tracked `/go` links), no
 third-party requests, and a header button that reads "Inloggen" or, for a signed-in Stats Viewer,
 "Statistieken" (swapped per request into the pre-rendered page).
 
@@ -77,6 +77,13 @@ third-party requests, and a header button that reads "Inloggen" or, for a signed
 - `internal/content/layout.go` regroups a rendered body for presentation only: link lists and linked
   heading runs become cards, the home page gets coloured bands, product pages get CSS-only tabs. A
   test proves every word of the body survives in order.
+- The notice pill needs JavaScript: `web/static/notice.js` loads in `<head>` and marks `<html>`
+  before the body paints, unless the visitor dismissed it (a flag in `localStorage`, else
+  `sessionStorage`). Without JavaScript only the bar shows. Dismissals are not counted: the `/b`
+  beacon carries a Hit id and engaged time, nothing else.
+- Product pages get a split hero (photo, black panel with the category, H1 and an orange call to
+  action), pill tabs, and the spec table beside a materials box. The footer's "For agents" column
+  links `llms.txt`, the page's Markdown twin and the sitemap.
 - Pictures for pages without a lead image live in `web/static/img`, credited in
   `web/static/img/credits.yml` with alt text per locale. They are design, not content, so adding one
   is not a Content Release.
@@ -105,16 +112,23 @@ with the tribelt.nl crawl, any duplicate title or description, a second H1, an i
 text, or an internal link that goes nowhere. Loading is strict, so a typo in a front matter key
 fails the build instead of silently disappearing.
 
-**Every content change is a new Content Release.** Change `release` in `content/site.yml`:
+**Every release that changes content is a new Content Release.** Before the release PR can merge,
+`release` in `content/site.yml` must carry a label the previous release did not:
 
 ```yaml
 release: { label: v2-longtail-keywords, note: "Product titles lead with the long-tail term" }
 ```
 
-The label is a lowercase slug and must be new; CI (`task release-gate`) fails a change under
-`content/` that keeps the old label. The running release is recorded at startup, stamped on every
-Hit, drawn as a marker on every timeline and compared in *Release compare*. Sitemap `lastmod` is
-the date a page's current text first went live, so unchanged pages keep their date.
+The label is a lowercase slug. Several content PRs may share one label within a release, so a
+content PR does not have to bump it: CI only adds a notice when it changes `content/` while the
+label still equals the latest `vX.Y.Z` tag's. The release PR is where it is enforced. CI on a
+`release-please--*` branch (`task release-gate`, or `task release-gate:release` by hand) fails when
+anything under `content/` changed since the latest `vX.Y.Z` tag and the label did not. The fix is
+a label bump on `main`: release-please (`always-update`) then rebuilds its PR and CI runs again.
+Releases without content changes, and the first release, pass. The running release is recorded at
+startup, stamped on every Hit, drawn as a marker on every timeline and compared in *Release
+compare*. Sitemap `lastmod` is the date a page's current text first went live, so unchanged pages
+keep their date.
 
 ## Environment
 
