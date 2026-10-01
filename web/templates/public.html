@@ -35,7 +35,7 @@
 <link rel="preload" href="{{.}}" as="font" type="font/woff2" crossorigin>{{end}}
 {{- with .Hero}}
 <link rel="preload" as="image" href="{{.Src}}" {{.PreloadAttrs}} fetchpriority="high">{{end}}
-<script src="{{.Notice}}"></script>
+__TRIBELT_HUMAN__<script src="{{.Notice}}"></script>__TRIBELT_HUMAN_END__
 <link rel="stylesheet" href="{{.CSS}}">
 {{- if .JSONLD}}
 <script type="application/ld+json">{{.JSONLD}}</script>{{end}}
@@ -43,10 +43,10 @@
 </head>
 <body class="t-{{.Type}}{{if .Theme}} theme-{{.Theme}}{{end}}">
 <a class="skip" href="#main">{{.UI.Skip}}</a>
-<aside class="testbar" aria-label="{{.UI.Mirror}}">
-  <p><span class="tb-long">{{.UI.BarLong}}</span><span class="tb-short">{{.UI.BarShort}}</span>
+__TRIBELT_HUMAN__<aside class="testbar" aria-label="{{.UI.Mirror}}">
+  <p><span class="tb-badge">{{.UI.BarBadge}}</span><span class="tb-long">{{.UI.BarLong}}</span><span class="tb-short">{{.UI.BarShort}}</span>
   <a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.UI.BarLink}}<span aria-hidden="true"> →</span></a></p>
-</aside>
+</aside>__TRIBELT_HUMAN_END__
 <header class="site-header">
   <div class="hd">
     <a class="brand" href="{{.HomeHref}}"><img src="{{.Logo}}" alt="{{.SiteName}}" width="150" height="50"><span class="brand-tag">mirror</span></a>
@@ -214,10 +214,10 @@
     </div>
   </div>
 </footer>
-<aside class="notice" aria-label="{{.UI.NoticeLabel}}">
+__TRIBELT_HUMAN__<aside class="notice" aria-label="{{.UI.NoticeLabel}}">
   <p>{{.UI.NoticeText}} <a href="{{.Footer.OfficialHref}}" rel="nofollow">{{.Footer.OfficialLabel}}</a></p>
-  <button class="notice-close" type="button" data-notice-close aria-label="{{.UI.NoticeClose}}"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-</aside>
+  <button class="notice-close" type="button" data-notice-close aria-label="{{.UI.NoticeClose}}"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+</aside>__TRIBELT_HUMAN_END__
 </body>
 </html>
 {{end}}

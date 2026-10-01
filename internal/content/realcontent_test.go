@@ -107,7 +107,7 @@ var (
 )
 
 // html is a page as a signed-out visitor receives it, with "HIT" as the Hit id.
-func html(r *Resource) string { return string(bytes.Join(r.Parts("HIT", false), nil)) }
+func html(r *Resource) string { return string(bytes.Join(r.Parts("HIT", false, true), nil)) }
 
 func ldTypes(t *testing.T, path, doc string) []string {
 	t.Helper()

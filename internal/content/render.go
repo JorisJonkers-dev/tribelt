@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -21,6 +22,12 @@ const HitPlaceholder = "__TRIBELT_HIT__"
 // AuthPlaceholder marks where the per-request sign-in or stats button goes in pre-rendered HTML.
 const AuthPlaceholder = "__TRIBELT_AUTH__"
 
+// HumanStart and HumanEnd enclose markup served only to a person browsing: the test-site bar and pill.
+const (
+	HumanStart = "__TRIBELT_HUMAN__"
+	HumanEnd   = "__TRIBELT_HUMAN_END__"
+)
+
 // Resource is one pre-rendered public response.
 type Resource struct {
 	Path        string
@@ -28,21 +35,100 @@ type Resource struct {
 	Locale      string
 	Format      string // html | md | txt | xml
 	ContentType string
-	// Body is the whole response; for HTML it is split around the Hit and auth placeholders into
-	// Head, Mid and Tail, with the two prepared buttons for the auth slot.
+	// Body is the whole response; for HTML it is split into segments around the placeholders, with
+	// the two prepared buttons for the auth slot.
 	Body                []byte
-	Head, Mid, Tail     []byte
+	segments            []segment
 	SignedOut, SignedIn []byte
 	ETag                string
 }
 
-// Parts are the pieces of an HTML response: the page with this request's Hit id and header button.
-func (r *Resource) Parts(hit string, signedIn bool) [][]byte {
-	button := r.SignedOut
-	if signedIn {
-		button = r.SignedIn
+type slot int
+
+const (
+	slotText slot = iota
+	slotHit
+	slotAuth
+)
+
+type segment struct {
+	slot  slot
+	text  []byte
+	human bool
+}
+
+// Parts are the pieces of an HTML response: the page with this request's Hit id and header button,
+// and the human-only markup when human is set.
+func (r *Resource) Parts(hit string, signedIn, human bool) [][]byte {
+	parts := make([][]byte, 0, len(r.segments))
+	for _, s := range r.segments {
+		if s.human && !human {
+			continue
+		}
+		switch s.slot {
+		case slotHit:
+			parts = append(parts, []byte(hit))
+		case slotAuth:
+			if signedIn {
+				parts = append(parts, r.SignedIn)
+			} else {
+				parts = append(parts, r.SignedOut)
+			}
+		case slotText:
+			parts = append(parts, s.text)
+		}
 	}
-	return [][]byte{r.Head, []byte(hit), r.Mid, button, r.Tail}
+	return parts
+}
+
+// split cuts a rendered page at its placeholders. It needs one Hit and one auth slot, and balanced
+// human-only regions.
+func split(page []byte) ([]segment, error) {
+	var segs []segment
+	human, hits, auths := false, 0, 0
+	for len(page) > 0 {
+		i, tok := nextPlaceholder(page)
+		if i < 0 {
+			segs = append(segs, segment{text: page, human: human})
+			break
+		}
+		if i > 0 {
+			segs = append(segs, segment{text: page[:i], human: human})
+		}
+		page = page[i+len(tok):]
+		switch tok {
+		case HitPlaceholder:
+			segs = append(segs, segment{slot: slotHit, human: human})
+			hits++
+		case AuthPlaceholder:
+			segs = append(segs, segment{slot: slotAuth, human: human})
+			auths++
+		case HumanStart, HumanEnd:
+			if human == (tok == HumanStart) {
+				return nil, fmt.Errorf("unbalanced %s", tok)
+			}
+			human = !human
+		}
+	}
+	switch {
+	case hits == 0:
+		return nil, errors.New("lacks the hit placeholder")
+	case auths == 0:
+		return nil, errors.New("lacks the auth placeholder")
+	case human:
+		return nil, fmt.Errorf("unclosed %s", HumanStart)
+	}
+	return segs, nil
+}
+
+func nextPlaceholder(page []byte) (int, string) {
+	at, found := -1, ""
+	for _, tok := range []string{HitPlaceholder, AuthPlaceholder, HumanEnd, HumanStart} {
+		if i := bytes.Index(page, []byte(tok)); i >= 0 && (at < 0 || i < at) {
+			at, found = i, tok
+		}
+	}
+	return at, found
 }
 
 // Asset is a static file served with a long cache lifetime.
@@ -149,13 +235,9 @@ func (b *builder) html(name string, view any, p, id, locale string) (*Resource, 
 	if err := b.tmpl.ExecuteTemplate(&buf, name, view); err != nil {
 		return nil, err
 	}
-	head, rest, ok := bytes.Cut(buf.Bytes(), []byte(HitPlaceholder))
-	if !ok {
-		return nil, fmt.Errorf("template %s lacks the hit placeholder", name)
-	}
-	mid, tail, ok := bytes.Cut(rest, []byte(AuthPlaceholder))
-	if !ok {
-		return nil, fmt.Errorf("template %s lacks the auth placeholder", name)
+	segs, err := split(buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("template %s: %w", name, err)
 	}
 	out, in, err := b.authButtons(locale)
 	if err != nil {
@@ -163,7 +245,7 @@ func (b *builder) html(name string, view any, p, id, locale string) (*Resource, 
 	}
 	return &Resource{
 		Path: p, PageID: id, Locale: locale, Format: "html", ContentType: "text/html; charset=utf-8",
-		Head: head, Mid: mid, Tail: tail, SignedOut: out, SignedIn: in,
+		segments: segs, SignedOut: out, SignedIn: in,
 	}, nil
 }
 

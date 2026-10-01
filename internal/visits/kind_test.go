@@ -198,3 +198,28 @@ type unreadable struct {
 }
 
 func (u unreadable) ReadFile(string) ([]byte, error) { return nil, errors.New("boom") }
+
+func TestBrowsing(t *testing.T) {
+	const chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+	cases := []struct {
+		ua, dest string
+		want     bool
+	}{
+		{chrome, "document", true},
+		{"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", "document", true},
+		{chrome, "", false},
+		{chrome, "empty", false},
+		{"curl/8.7.1", "document", false},
+		{"curl/8.7.1", "", false},
+		{"python-requests/2.32", "", false},
+		{"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)", "document", false},
+		{"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.0.0 Safari/537.36", "document", false},
+		{"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.2; +https://openai.com/gptbot)", "document", false},
+		{"", "document", false},
+	}
+	for _, c := range cases {
+		if got := Browsing(c.ua, c.dest); got != c.want {
+			t.Errorf("Browsing(%q, %q) = %v, want %v", c.ua, c.dest, got, c.want)
+		}
+	}
+}

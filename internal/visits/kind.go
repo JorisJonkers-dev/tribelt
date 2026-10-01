@@ -249,3 +249,13 @@ func looksLikeBrowser(ua string) bool {
 	}
 	return strings.Contains(ua, "AppleWebKit/") || strings.Contains(ua, "Gecko/") || strings.Contains(ua, "Trident/")
 }
+
+// Browsing reports whether a request looks like a person loading a page in a browser: a browser
+// user-agent that no bot rule claims, and the Sec-Fetch-Dest header browsers send on navigation.
+// curl, HTTP libraries and agents that fake a browser user-agent rarely send that header.
+func Browsing(ua, fetchDest string) bool {
+	if fetchDest != "document" {
+		return false
+	}
+	return Classify(ua, netip.Addr{}, nil).Kind.IsHuman()
+}
