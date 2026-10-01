@@ -3,8 +3,11 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/JorisJonkers-dev/tribelt/internal/content"
 	"github.com/JorisJonkers-dev/tribelt/internal/platform/pg/queries"
@@ -51,4 +54,40 @@ func Sync(ctx context.Context, s Store, c *content.Content, appVersion string) (
 		out[r.Path] = r.Since
 	}
 	return out, nil
+}
+
+// History is what Previous reads.
+type History interface {
+	LatestRelease(ctx context.Context) (string, error)
+	ReleasePageHashes(ctx context.Context, releaseLabel string) ([]queries.ReleasePageHashesRow, error)
+}
+
+// Previous returns the release the last process served and its page hashes by path; read it before
+// Sync records the running one. An empty label means there was none.
+func Previous(ctx context.Context, h History) (string, map[string]string, error) {
+	label, err := h.LatestRelease(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, nil
+	}
+	if err != nil {
+		return "", nil, fmt.Errorf("release: latest: %w", err)
+	}
+	rows, err := h.ReleasePageHashes(ctx, label)
+	if err != nil {
+		return "", nil, fmt.Errorf("release: pages of %s: %w", label, err)
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.Path] = r.ContentHash
+	}
+	return label, out, nil
+}
+
+// Hashes is the content hash of every page of c by path, as Sync stores them.
+func Hashes(c *content.Content) map[string]string {
+	out := make(map[string]string, len(c.Pages))
+	for _, p := range c.Pages {
+		out[p.Path] = p.Hash()
+	}
+	return out
 }

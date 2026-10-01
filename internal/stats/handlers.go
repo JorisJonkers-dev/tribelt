@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/JorisJonkers-dev/tribelt/internal/integrations"
 	"github.com/JorisJonkers-dev/tribelt/internal/platform/pg/queries"
 	"github.com/JorisJonkers-dev/tribelt/internal/visits"
 )
@@ -39,7 +40,14 @@ type Service struct {
 	ViewerName   func(r *http.Request) string
 	Search       SearchSources
 	CSS, ChartJS string
-	tmpl         *template.Template
+	// Integrations, when set, adds the Integrations view and makes Search sources live.
+	Integrations *integrations.Manager
+	// Actor is the signed-in viewer as the Integrations see them (admin or not).
+	Actor func(r *http.Request) integrations.Actor
+	// Session identifies the session a CSRF token is bound to; CSRFKey signs the tokens.
+	Session func(r *http.Request) string
+	CSRFKey []byte
+	tmpl    *template.Template
 }
 
 func funcs() template.FuncMap {
@@ -65,6 +73,8 @@ func funcs() template.FuncMap {
 		"searchPanel":   func(p page, s SearchSummary) searchPanel { return searchPanel{Filter: p.Filter, Search: s} },
 		"searchSummary": func(src SearchSources) SearchSummary { return SearchSummary{Sources: src} },
 		"side":          func(label string, r *ReleaseRow) releaseSide { return releaseSide{Side: label, Row: r} },
+		"kindTitle":     integrations.Title,
+		"intCard":       func(p IntegrationsPage, c integrations.Card) intCard { return intCard{Page: p, Card: c} },
 	}
 }
 
@@ -80,6 +90,11 @@ type searchPanel struct {
 	Search SearchSummary
 }
 
+type intCard struct {
+	Page IntegrationsPage
+	Card integrations.Card
+}
+
 type releaseSide struct {
 	Side string
 	Row  *ReleaseRow
@@ -87,7 +102,7 @@ type releaseSide struct {
 
 // Init parses the stats templates.
 func (s *Service) Init(templates fs.FS) error {
-	t, err := template.New("stats.html").Funcs(funcs()).ParseFS(templates, "stats.html")
+	t, err := template.New("stats.html").Funcs(funcs()).ParseFS(templates, "stats.html", "stats-integrations.html")
 	if err != nil {
 		return err
 	}
@@ -112,6 +127,10 @@ func (s *Service) Routes(mux *http.ServeMux, guard func(http.Handler) http.Handl
 	h("GET /stats/releases", s.view("releases"))
 	h("GET /stats/agents", s.view("agents"))
 	h("GET /stats/search", s.view("search"))
+	if s.Integrations != nil {
+		h("GET /stats/integrations", s.integrationsView)
+		h("POST /stats/integrations/{kind}/{action}", s.integrationsAction)
+	}
 	h("GET /stats/chart/{name}", s.chartSVG)
 	h("GET /stats/export.sqlite", s.exportSQLite)
 	h("GET /stats/{file}", s.csv)
@@ -158,10 +177,11 @@ func (s *Service) load(ctx context.Context, view string, f Filter) (any, error) 
 func viewTitle(view string) string {
 	return map[string]string{
 		"overview": "Overview", "pages": "Pages", "page": "Page detail", "releases": "Releases", "agents": "AI & crawlers", "search": "Search",
+		"integrations": "Integrations",
 	}[view]
 }
 
-func tabs(view string, f Filter) []Tab {
+func tabs(view string, f Filter, withIntegrations bool) []Tab {
 	q := "?" + f.Query("path", "", "q", "", "kind", "", "a", "", "b", "")
 	var out []Tab
 	for _, t := range []struct{ view, label, href string }{
@@ -170,7 +190,11 @@ func tabs(view string, f Filter) []Tab {
 		{"releases", "Releases", "/stats/releases"},
 		{"agents", "AI & crawlers", "/stats/agents"},
 		{"search", "Search", "/stats/search"},
+		{"integrations", "Integrations", "/stats/integrations"},
 	} {
+		if t.view == "integrations" && !withIntegrations {
+			continue
+		}
 		on := t.view == view || (t.view == "pages" && view == "page")
 		out = append(out, Tab{Label: t.label, Href: t.href + q, On: on})
 	}
@@ -180,7 +204,7 @@ func tabs(view string, f Filter) []Tab {
 func (s *Service) chrome(ctx context.Context, r *http.Request, view string, f Filter) (page, error) {
 	p := page{
 		Title: viewTitle(view), View: view, Release: s.Release, AppVersion: s.AppVersion, CSS: s.CSS, JS: s.ChartJS, Filter: f,
-		Tabs: tabs(view, f),
+		Tabs: tabs(view, f, s.Integrations != nil),
 	}
 	for _, n := range []int{7, 30, 90} {
 		label := strconv.Itoa(n) + "d"

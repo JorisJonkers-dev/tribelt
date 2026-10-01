@@ -128,6 +128,7 @@ tasks:
     env:
       DATABASE_URL: "{{.DATABASE_URL}}"
       DEV_AUTH_BYPASS: "1"
+      SESSION_KEY: development-only-session-key-not-secret
       CONTENT_DIR: content
     cmd: go run ./cmd/{{.APP}} serve
 

@@ -3,6 +3,9 @@ package main
 
 import (
 	"context"
+	"crypto/hkdf"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,6 +19,7 @@ import (
 	"github.com/JorisJonkers-dev/tribelt"
 	"github.com/JorisJonkers-dev/tribelt/internal/content"
 	"github.com/JorisJonkers-dev/tribelt/internal/hits"
+	"github.com/JorisJonkers-dev/tribelt/internal/integrations"
 	"github.com/JorisJonkers-dev/tribelt/internal/platform/config"
 	"github.com/JorisJonkers-dev/tribelt/internal/platform/httpx"
 	"github.com/JorisJonkers-dev/tribelt/internal/platform/oidc"
@@ -108,6 +112,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	defer store.Close()
+	prevRelease, prevHashes, err := release.Previous(ctx, store.Q())
+	if err != nil {
+		return err
+	}
 	lastMod, err := release.Sync(ctx, store.Q(), c, version)
 	if err != nil {
 		return err
@@ -140,10 +148,16 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if statsOn {
 		pages.Viewer = func(r *http.Request) bool { _, ok := gate.Viewer(r); return ok }
 	}
-	mux.Handle("/", tracker.Middleware(pages))
-	searchOn := startSearchImport(ctx, cfg, store, logger)
+	integ := newIntegrations(cfg, store, c, logger)
+	mux.Handle("/", integ.KeyFile(tracker.Middleware(pages)))
+	go integ.Run(ctx, time.Minute, 10*time.Minute)
+	if label := c.Site.Release.Label; prevRelease != "" && prevRelease != label {
+		changed := integrations.ChangedURLs(cfg.BaseURL, prevHashes, release.Hashes(c))
+		logger.Info("new content release", "previous", prevRelease, "release", label, "changed_pages", len(changed))
+		go integ.NotifyChanged(ctx, label, changed)
+	}
 	if statsOn {
-		if err := mountStats(mux, gate, store, c, built, searchOn, version, logger); err != nil {
+		if err := mountStats(mux, gate, store, c, built, integ, cfg, version, logger); err != nil {
 			return err
 		}
 	} else {
@@ -174,7 +188,7 @@ func newTracker(cfg config.Config, c *content.Content, rec *hits.Recorder, gate 
 	return t, nil
 }
 
-func mountStats(mux *http.ServeMux, gate oidc.Gate, store *pg.Store, c *content.Content, built *content.Built, search stats.SearchSources, version string, logger *slog.Logger) error {
+func mountStats(mux *http.ServeMux, gate oidc.Gate, store *pg.Store, c *content.Content, built *content.Built, integ *integrations.Manager, cfg config.Config, version string, logger *slog.Logger) error {
 	svc := &stats.Service{
 		Q: store.Q(), DB: store.Pool(), Log: logger, Now: time.Now, Release: c.Site.Release.Label, AppVersion: version,
 		PageCount: len(c.Pages),
@@ -185,7 +199,14 @@ func mountStats(mux *http.ServeMux, gate oidc.Gate, store *pg.Store, c *content.
 			return ""
 		},
 		ViewerName: func(r *http.Request) string { v, _ := gate.Viewer(r); return v.Name },
-		Search:     search, CSS: built.AssetURL("/static/stats.css"), ChartJS: built.AssetURL("/static/chart.js"),
+		CSS:        built.AssetURL("/static/stats.css"), ChartJS: built.AssetURL("/static/chart.js"),
+		Integrations: integ,
+		Actor: func(r *http.Request) integrations.Actor {
+			v, _ := gate.Viewer(r)
+			return integrations.Actor{Sub: v.Sub, Name: v.Name, Admin: v.Admin}
+		},
+		Session: gate.Session,
+		CSRFKey: csrfKey(cfg.SessionKey),
 	}
 	if err := svc.Init(sub(web.Templates, "templates")); err != nil {
 		return err
@@ -239,33 +260,44 @@ func newGate(ctx context.Context, cfg config.Config, logger *slog.Logger) (gate 
 		return a, err == nil, err
 	case cfg.DevAuthBypass && !cfg.Production:
 		logger.Warn("DEV_AUTH_BYPASS=1: /stats is open to anyone who can reach this process")
-		return oidc.DevBypass{}, true, nil
+		return oidc.DevBypass{ReadOnly: cfg.DevAuthViewer}, true, nil
 	default:
 		return oidc.DevBypass{}, false, nil
 	}
 }
 
-func startSearchImport(ctx context.Context, cfg config.Config, store *pg.Store, logger *slog.Logger) stats.SearchSources {
-	var sources []stats.Source
-	var on stats.SearchSources
-	if cfg.GSCServiceAccountJSON != "" && cfg.GSCSiteURL != "" {
-		gsc, err := stats.NewGSC(ctx, []byte(cfg.GSCServiceAccountJSON), cfg.GSCSiteURL)
-		if err != nil {
-			logger.Error("search console import disabled", "error", err)
-		} else {
-			sources = append(sources, gsc)
-			on.Google = true
+// launch is the first day the site was public; no backfill reaches further.
+func launch() time.Time { return time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC) }
+
+func newIntegrations(cfg config.Config, store *pg.Store, c *content.Content, logger *slog.Logger) *integrations.Manager {
+	sealer, err := integrations.NewSealer(cfg.SessionKey)
+	if err != nil {
+		logger.Warn("integration credentials cannot be saved in the UI: SESSION_KEY is unset or too short")
+		sealer = nil
+	}
+	urls := make([]string, 0, len(c.Pages))
+	for _, p := range c.Pages {
+		urls = append(urls, cfg.BaseURL+p.Path)
+	}
+	return &integrations.Manager{
+		Q: store.Q(), Sealer: sealer, Endpoints: integrations.DefaultEndpoints(),
+		Env: integrations.Env{
+			GSCServiceAccountJSON: cfg.GSCServiceAccountJSON, GSCSiteURL: cfg.GSCSiteURL,
+			BingAPIKey: cfg.BingAPIKey, BingSiteURL: cfg.BingSiteURL,
+		},
+		HTTP: &http.Client{Timeout: time.Minute}, BaseURL: cfg.BaseURL, Launch: launch(),
+		PageURLs: func() []string { return urls }, Log: logger, Now: time.Now,
+	}
+}
+
+// csrfKey derives the CSRF signing key from SESSION_KEY, or a per-process one without it.
+func csrfKey(secret string) []byte {
+	if secret != "" {
+		if k, err := hkdf.Key(sha256.New, []byte(secret), nil, "tribelt-csrf-v1", 32); err == nil {
+			return k
 		}
 	}
-	if cfg.BingAPIKey != "" && cfg.BingSiteURL != "" {
-		sources = append(sources, &stats.Bing{HTTP: &http.Client{Timeout: time.Minute}, BaseURL: "https://ssl.bing.com", SiteURL: cfg.BingSiteURL, APIKey: cfg.BingAPIKey})
-		on.Bing = true
-	}
-	if len(sources) == 0 {
-		logger.Info("search performance import disabled: no credentials")
-		return on
-	}
-	im := &stats.Importer{Sources: sources, Store: store.Q(), Log: logger, Now: time.Now, Lookback: 10}
-	go im.Run(ctx, time.Minute, 24*time.Hour)
-	return on
+	k := make([]byte, 32)
+	_, _ = rand.Read(k)
+	return k
 }

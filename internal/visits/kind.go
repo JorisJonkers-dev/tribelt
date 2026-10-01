@@ -63,6 +63,13 @@ func Classify(ua string, ip netip.Addr, ranges *Ranges) Classification {
 	return Classification{Kind: KindOtherBot, BotName: firstProduct(ua)}
 }
 
+// ClaimedBot names the crawler a user-agent claims to be, without the address check. It reads
+// request logs that carry no client address, such as Cloudflare's edge analytics.
+func ClaimedBot(ua string) (name string, kind Kind, ok bool) {
+	b, ok := identifyBot(ua)
+	return b.name, b.kind, ok
+}
+
 type bot struct {
 	token    string
 	name     string

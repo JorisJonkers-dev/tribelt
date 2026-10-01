@@ -10,6 +10,15 @@ import (
 	"github.com/google/uuid"
 )
 
+type CloudflareDaily struct {
+	Host       string
+	Day        time.Time
+	Dimension  string
+	Value      string
+	Requests   int64
+	ImportedAt time.Time
+}
+
 type Hit struct {
 	ID              uuid.UUID
 	Ts              time.Time
@@ -39,6 +48,44 @@ type Hit struct {
 	EngagedMs       *int64
 	Resource        string
 	AppVersion      string
+}
+
+type Integration struct {
+	Kind          string
+	Credential    []byte
+	KeyID         *string
+	Fingerprint   *string
+	Account       string
+	Target        string
+	Enabled       bool
+	Meta          []byte
+	CreatedBySub  *string
+	CreatedByName *string
+	CreatedAt     *time.Time
+	UpdatedBySub  *string
+	UpdatedByName *string
+	UpdatedAt     *time.Time
+	LastSyncAt    *time.Time
+	LastSuccessAt *time.Time
+	LastError     *string
+	LastErrorCode *string
+	NextSyncAt    *time.Time
+	RunningSince  *time.Time
+	BackfilledAt  *time.Time
+}
+
+type IntegrationEvent struct {
+	ID         int64
+	Kind       string
+	Action     string
+	Ok         bool
+	Code       string
+	Detail     string
+	Count      *int64
+	HttpStatus *int64
+	ActorSub   *string
+	ActorName  string
+	At         time.Time
 }
 
 type OutboundClick struct {

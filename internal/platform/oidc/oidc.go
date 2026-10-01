@@ -30,14 +30,19 @@ const (
 	flowTTL       = 10 * time.Minute
 )
 
-// Roles that may read the stats.
-func allowedRoles() []string { return []string{"SERVICE_TRIBELT", "ROLE_ADMIN"} }
+// Roles that may read the stats; only the admin role may change Integrations.
+func allowedRoles() []string { return []string{"SERVICE_TRIBELT", AdminRole} }
+
+// AdminRole is auth-api's administrator role.
+const AdminRole = "ROLE_ADMIN"
 
 // Viewer is a signed-in Stats Viewer.
 type Viewer struct {
 	Sub     string `json:"sub"`
 	Name    string `json:"name"`
 	IDToken string `json:"idt,omitempty"`
+	// Admin is fixed at sign-in from the ID token's roles, for the session's lifetime.
+	Admin bool `json:"adm,omitempty"`
 }
 
 // Gate decides who may see /stats and whether a request is an Internal Hit.
@@ -45,6 +50,8 @@ type Gate interface {
 	Viewer(r *http.Request) (Viewer, bool)
 	Require(next http.Handler) http.Handler
 	Routes(mux *http.ServeMux)
+	// Session identifies the signed-in session, for binding CSRF tokens; empty when signed out.
+	Session(r *http.Request) string
 }
 
 // Config is the OIDC client registration.
@@ -165,14 +172,14 @@ func (a *Auth) callback(w http.ResponseWriter, r *http.Request) {
 		page(w, http.StatusForbidden, "Access denied", "This account may not view the statistics.")
 		return
 	}
-	v := Viewer{Sub: cl.Sub, Name: firstNonEmpty(cl.PreferredUsername, cl.Name, cl.Email, cl.Sub), IDToken: rawID}
+	v := Viewer{Sub: cl.Sub, Name: firstNonEmpty(cl.PreferredUsername, cl.Name, cl.Email, cl.Sub), IDToken: rawID, Admin: slices.Contains(cl.Roles, AdminRole)}
 	sealed, err := a.codec.Seal(SessionCookie, v, a.now(), sessionTTL)
 	if err != nil {
 		a.fail(w, http.StatusInternalServerError, "seal session", err)
 		return
 	}
 	setCookie(w, SessionCookie, sealed, sessionTTL)
-	a.log.Info("stats viewer signed in", "sub", cl.Sub)
+	a.log.Info("stats viewer signed in", "sub", cl.Sub, "admin", v.Admin)
 	http.Redirect(w, r, f.Next, http.StatusFound)
 }
 
@@ -201,6 +208,15 @@ func (a *Auth) Viewer(r *http.Request) (Viewer, bool) {
 		return Viewer{}, false
 	}
 	return v, true
+}
+
+// Session is the sealed session cookie of a signed-in Stats Viewer.
+func (a *Auth) Session(r *http.Request) string {
+	if _, ok := a.Viewer(r); !ok {
+		return ""
+	}
+	c, _ := r.Cookie(SessionCookie)
+	return c.Value
 }
 
 // Require sends anonymous requests to login and back.
@@ -258,15 +274,27 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// DevBypass is a Gate that treats every request to /stats as a local developer. Never in production.
-type DevBypass struct{}
+// DevBypass is a Gate that treats every request to /stats as a local developer, an admin unless
+// ReadOnly (DEV_AUTH_BYPASS=viewer). Never in production.
+type DevBypass struct{ ReadOnly bool }
 
 // Viewer reports the developer only on stats pages, so public Hits stay non-internal.
-func (DevBypass) Viewer(r *http.Request) (Viewer, bool) {
+func (d DevBypass) Viewer(r *http.Request) (Viewer, bool) {
 	if strings.HasPrefix(r.URL.Path, "/stats") {
-		return Viewer{Sub: "dev", Name: "developer"}, true
+		if d.ReadOnly {
+			return Viewer{Sub: "dev-viewer", Name: "viewer"}, true
+		}
+		return Viewer{Sub: "dev", Name: "developer", Admin: true}, true
 	}
 	return Viewer{}, false
+}
+
+// Session is fixed: the bypass has no sessions.
+func (d DevBypass) Session(r *http.Request) string {
+	if v, ok := d.Viewer(r); ok {
+		return "dev-bypass:" + v.Sub
+	}
+	return ""
 }
 
 // Require lets everything through.

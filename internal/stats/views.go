@@ -45,10 +45,23 @@ type Querier interface {
 }
 
 // SearchSources says which Search Performance imports have credentials.
-type SearchSources struct{ Google, Bing bool }
+type SearchSources struct {
+	Google, Bing bool
+	// Managed means the Integrations page exists to connect them.
+	Managed bool
+}
 
 // Any reports whether at least one import runs.
 func (s SearchSources) Any() bool { return s.Google || s.Bing }
+
+// searchSources is live when Integrations are mounted: a source saved in the UI counts at once.
+func (s *Service) searchSources(ctx context.Context) SearchSources {
+	if s.Integrations == nil {
+		return s.Search
+	}
+	g, b := s.Integrations.SearchSources(ctx)
+	return SearchSources{Google: g, Bing: b, Managed: true}
+}
 
 func (s *Service) markers(ctx context.Context) ([]Marker, []queries.Release, error) {
 	rels, err := s.Q.ListReleases(ctx)

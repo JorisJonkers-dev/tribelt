@@ -134,6 +134,15 @@ func TestClassifyCorpus(t *testing.T) {
 	}
 }
 
+func TestClaimedBot(t *testing.T) {
+	if name, kind, ok := ClaimedBot("Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)"); !ok || name != "GPTBot" || kind != KindAICrawler {
+		t.Fatalf("GPTBot: %s %s %v", name, kind, ok)
+	}
+	if _, _, ok := ClaimedBot("Mozilla/5.0 Chrome/140.0 Safari/537.36"); ok {
+		t.Fatal("a browser claims no crawler")
+	}
+}
+
 func TestKinds(t *testing.T) {
 	if len(Kinds()) != 7 {
 		t.Fatal("seven Visitor Kinds")

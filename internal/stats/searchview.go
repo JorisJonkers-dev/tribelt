@@ -56,7 +56,7 @@ func (s *Service) searchDays(ctx context.Context, f Filter) ([]time.Time, []DayS
 // SearchPerformance gathers the Search view.
 func (s *Service) SearchPerformance(ctx context.Context, f Filter) (*SearchView, error) {
 	v := &SearchView{
-		Sources: s.Search, SVGHref: "/stats/chart/search.svg?" + f.Query(),
+		Sources: s.searchSources(ctx), SVGHref: "/stats/chart/search.svg?" + f.Query(),
 		File: "search-" + f.From.Format(time.DateOnly) + "-" + f.To.Format(time.DateOnly),
 	}
 	window := queries.SearchTotalsParams{FromDay: f.Start(), ToDay: f.End()}

@@ -38,3 +38,10 @@ SELECT DISTINCT unnest(tags)::text AS tag FROM releases ORDER BY 1;
 
 -- name: AppVersions :many
 SELECT DISTINCT unnest(app_versions)::text AS app_version FROM releases ORDER BY 1;
+
+-- name: LatestRelease :one
+-- The release the previous process served: the most recently seen one.
+SELECT label FROM releases ORDER BY last_seen_at DESC, first_seen_at DESC LIMIT 1;
+
+-- name: ReleasePageHashes :many
+SELECT path, content_hash FROM pages WHERE release_label = @release_label ORDER BY path;

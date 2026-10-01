@@ -50,7 +50,7 @@
   </nav>
 </header>
 <main id="main" class="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 pt-7 pb-14 sm:px-8">
-{{template "filters" .}}
+{{if ne .View "integrations"}}{{template "filters" .}}{{end}}
 {{end}}
 
 {{define "hidden"}}
@@ -415,7 +415,7 @@
     <h2 class="h2">{{if .Sources.Any}}No Search Performance data for this range yet{{else}}Search Performance is not connected yet{{end}}</h2>
     <p class="m-0 max-w-[640px] leading-normal text-muted">{{if .Sources.Any}}The daily import runs, but the search engines have reported nothing for these days. Their figures lag by two to three days.{{else}}Server logs cannot see search keywords. Connect Google Search Console and Bing Webmaster Tools to see queries, impressions and average position per page and per Content Release.{{end}}</p>
     <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
-      {{if not .Sources.Any}}<a href="/stats/search?{{qs $.Filter}}#connect" class="btn-light">How to connect</a>{{end}}
+      {{if not .Sources.Any}}{{if .Sources.Managed}}<a href="/stats/integrations" class="btn-light">Open Integrations</a>{{else}}<a href="/stats/search?{{qs $.Filter}}#connect" class="btn-light">How to connect</a>{{end}}{{end}}
       <span class="flex items-center gap-2 text-xs text-muted">
         <span class="size-2 rounded-full {{if .Sources.Google}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span> Google: {{if .Sources.Google}}connected{{else}}no credentials{{end}}
         <span class="ml-2 size-2 rounded-full {{if .Sources.Bing}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span> Bing: {{if .Sources.Bing}}connected{{else}}no credentials{{end}}
@@ -725,7 +725,8 @@
 {{end}}
 <section id="connect" aria-labelledby="connect-title" class="card flex flex-col gap-3 px-4 py-[22px] sm:px-6">
   <h2 id="connect-title" class="h2">Connecting the imports</h2>
-  <p class="m-0 max-w-[760px] leading-normal text-muted">The binary imports the last ten days once a day. Set the variables below on the deployment (secrets arrive via Vault) and restart; an import with empty credentials stays off.</p>
+  {{if .Sources.Managed}}<p class="m-0 max-w-[760px] leading-normal text-muted">An administrator connects Google Search Console and Bing Webmaster Tools on the <a href="/stats/integrations">Integrations</a> page; a credential saved there takes precedence over the Vault-managed variables below. The import runs once a day and backfills on first connect.</p>
+  {{else}}<p class="m-0 max-w-[760px] leading-normal text-muted">The binary imports the last ten days once a day. Set the variables below on the deployment (secrets arrive via Vault) and restart; an import with empty credentials stays off.</p>{{end}}
   <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
     <div class="flex flex-col gap-1.5 rounded-[10px] border border-hair px-3.5 py-3 text-[13px]">
       <span class="flex items-center gap-2 font-medium"><span class="size-2 rounded-full {{if .Sources.Google}}bg-live{{else}}bg-dim{{end}}" aria-hidden="true"></span>Google Search Console · {{if .Sources.Google}}connected{{else}}no credentials{{end}}</span>

@@ -299,7 +299,7 @@ func botKindRows(rows []queries.BotKindsRow) []BotKindRow {
 
 // Overview gathers the landing view.
 func (s *Service) Overview(ctx context.Context, f Filter) (*Overview, error) {
-	o := &Overview{Search: SearchSummary{Sources: s.Search}}
+	o := &Overview{Search: SearchSummary{Sources: s.searchSources(ctx)}}
 	tl, d, err := s.kindTimeline(ctx, "timeline", f, visits.Kinds())
 	if err != nil {
 		return nil, err
