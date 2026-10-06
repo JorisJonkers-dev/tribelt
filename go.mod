@@ -3,6 +3,7 @@ module github.com/JorisJonkers-dev/tribelt
 go 1.26.4
 
 require (
+	github.com/JorisJonkers-dev/go-commons v0.1.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/google/uuid v1.6.0

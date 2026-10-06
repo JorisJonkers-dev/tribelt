@@ -14,7 +14,8 @@ func TestSecureHeaders(t *testing.T) {
 		rec := httptest.NewRecorder()
 		Secure(hsts, http.NotFoundHandler()).ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
 		h := rec.Header()
-		if h.Get("Content-Security-Policy") == "" || h.Get("X-Content-Type-Options") != "nosniff" || (h.Get("Strict-Transport-Security") != "") != hsts {
+		if h.Get("Content-Security-Policy") == "" || h.Get("X-Content-Type-Options") != "nosniff" || (h.Get("Strict-Transport-Security") != "") != hsts ||
+			h.Get("Permissions-Policy") != "camera=(), microphone=(), geolocation=(), interest-cohort=()" || h.Get("X-Frame-Options") != "DENY" {
 			t.Fatalf("headers %v", h)
 		}
 	}

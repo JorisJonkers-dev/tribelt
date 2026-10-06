@@ -7,22 +7,26 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/JorisJonkers-dev/go-commons/secure"
 )
 
-// Secure sets the security headers every response carries. No page loads anything from elsewhere.
+// contentSecurityPolicy is tribelt's: no page loads anything from elsewhere.
+const contentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+// Secure sets the security headers every response carries: go-commons' fixed set, tribelt's own
+// content security policy and permissions policy, and HSTS when the site is served over HTTPS.
 func Secure(hsts bool, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()")
-		if hsts {
-			h.Set("Strict-Transport-Security", "max-age=31536000")
-		}
-		next.ServeHTTP(w, r)
-	})
+	policy := secure.Policy{
+		ContentSecurityPolicy: contentSecurityPolicy,
+		Permissions:           "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+	}
+	if hsts {
+		policy.HSTS = "max-age=31536000"
+	}
+	// Cannot fail: the policy names a content security policy.
+	wrap, _ := secure.Headers(policy)
+	return wrap(next)
 }
 
 // Recover turns a panic into a generic 500 and logs the detail.
