@@ -41,7 +41,8 @@ applications:
             delivery: env
             rotation: { tolerates: restart }
           - path: secret/data/platform/tribelt
-            keys: [oidc.client_secret, session_key, visitor_hmac_key, gsc.service_account_json, bing.api_key]
+            # The search-console keys stay out until Vault holds them: tribelt runs without them.
+            keys: [oidc.client_secret, session_key, visitor_hmac_key]
             access: read
             delivery: env
             rotation: { tolerates: restart }
