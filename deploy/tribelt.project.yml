@@ -1,0 +1,61 @@
+# deploy-kit Project Intent for tribelt: one Go Process with its own database on
+# the platform's Postgres, signing people in to /stats through auth.
+
+apiVersion: intent.jorisjonkers.dev/v1
+kind: Project
+schemaVersion: 1.0.0
+
+project: tribelt # the namespace derives: tribelt-system
+owner: joris
+
+applications:
+  - id: tribelt
+    migration: self # AUTO_MIGRATE applies the migrations on start
+
+    exposure:
+      - name: public
+        host: tribelt.jorisjonkers.dev
+        audience: anonymous # pages are public; /stats runs its own OIDC flow
+        routes:
+          - { path: /, match: prefix, process: tribelt, surface: http }
+
+    processes:
+      - name: tribelt
+        lifecycle: application
+        image: tribelt # an alias; the lock resolves digest, uid and gid
+        runtime: none # a static Go binary needs no Runtime Profile
+
+        provides:
+          http: 8080
+
+        dependsOn:
+          - { application: platform-postgres, surface: postgres }
+          - { application: auth, surface: http }
+
+        secrets:
+          # The login cluster.sh writes, until deploy-kit delivers an edge's credential
+          # (JorisJonkers-dev/deploy-kit#378).
+          - path: secret/data/tribelt-system/database
+            keys: [user, password]
+            access: read
+            delivery: env
+            rotation: { tolerates: restart }
+          - path: secret/data/platform/tribelt
+            keys: [oidc.client_secret, session_key, visitor_hmac_key, gsc.service_account_json, bing.api_key]
+            access: read
+            delivery: env
+            rotation: { tolerates: restart }
+
+        placement:
+          memory: 128Mi
+          cpu: 25m
+
+        writablePaths: [/tmp]
+
+        probes:
+          readiness: { path: /readyz, port: 8080 }
+          liveness: { path: /healthz, port: 8080 }
+
+        startupBudget: 60s # covers the migrations
+
+        cutover: continuous
