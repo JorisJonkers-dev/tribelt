@@ -43,10 +43,16 @@ jobs:
     outputs:
       images-lock-artifact: images-lock-${{ github.run_id }}
       fragment-images-lock-artifact: fragment-images-lock-${{ github.run_id }}
+      source-sha: ${{ steps.source.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      # The commit the release was cut from, so the fragment names it however publish was started.
+      - name: source-commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: resolve-image-digest
         id: digest
@@ -210,6 +216,7 @@ jobs:
     with:
       project-file: deploy/tribelt.project.yml
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      ref: ${{ needs.resolve-image-lock.outputs.source-sha }}
       validate-with: deploy/env
       validate-with-fragments: auth
       images-lock-artifact: ${{ needs.resolve-image-lock.outputs.fragment-images-lock-artifact }}
