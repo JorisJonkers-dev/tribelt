@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/JorisJonkers-dev/tribelt/compare/v0.8.1...v0.8.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* leave out the search-console keys Vault does not hold ([#28](https://github.com/JorisJonkers-dev/tribelt/issues/28)) ([973c3c9](https://github.com/JorisJonkers-dev/tribelt/commit/973c3c9a305b1d94184d307a75c4bdab8ebe6cd9))
+
 ## [0.8.1](https://github.com/JorisJonkers-dev/tribelt/compare/v0.8.0...v0.8.1) (2026-10-15)
 
 
