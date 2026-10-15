@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.7.0...v0.8.0) (2026-10-15)
+
+
+### Features
+
+* publish an Intent Fragment as the Project tribelt ([#23](https://github.com/JorisJonkers-dev/tribelt/issues/23)) ([383ff3d](https://github.com/JorisJonkers-dev/tribelt/commit/383ff3dbf30cc082b9acdbedcece353e34fa2f95))
+
 ## [0.7.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.6.0...v0.7.0) (2026-10-01)
 
 
