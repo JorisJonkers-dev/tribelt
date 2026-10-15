@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/JorisJonkers-dev/tribelt/compare/v0.8.0...v0.8.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* let Publish Fragment take the release's own commit ([#25](https://github.com/JorisJonkers-dev/tribelt/issues/25)) ([42fabf5](https://github.com/JorisJonkers-dev/tribelt/commit/42fabf5a4a9f2ff1db3f8ed628111e78379da318))
+
 ## [0.8.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.7.0...v0.8.0) (2026-10-15)
 
 
