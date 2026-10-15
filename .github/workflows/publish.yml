@@ -210,7 +210,6 @@ jobs:
     with:
       project-file: deploy/tribelt.project.yml
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
       validate-with: deploy/env
       validate-with-fragments: auth
       images-lock-artifact: ${{ needs.resolve-image-lock.outputs.fragment-images-lock-artifact }}
