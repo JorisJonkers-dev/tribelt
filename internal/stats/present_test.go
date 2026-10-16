@@ -2,6 +2,7 @@ package stats
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -9,32 +10,50 @@ import (
 	"github.com/JorisJonkers-dev/tribelt/internal/visits"
 )
 
-func TestFormatting(t *testing.T) {
+func TestAChangeIsShownAsASignedPercentOrNew(t *testing.T) {
 	for _, c := range []struct {
 		cur, prev float64
 		want      string
 		up        bool
 	}{{0, 0, "0%", true}, {5, 0, "new", true}, {138, 100, "+38%", true}, {96, 100, "−4%", false}, {3, 3, "0%", true}} {
-		if got, up := delta(c.cur, c.prev); got != c.want || up != c.up {
-			t.Errorf("delta(%v, %v) = %q %v", c.cur, c.prev, got, up)
-		}
+		t.Run(c.want, func(t *testing.T) {
+			if got, up := delta(c.cur, c.prev); got != c.want || up != c.up {
+				t.Fatalf("delta(%v, %v) = %q %v", c.cur, c.prev, got, up)
+			}
+		})
 	}
+}
+
+func TestATimeIsShownAsHowLongAgo(t *testing.T) {
 	n := now()
 	for d, want := range map[time.Duration]string{
 		10 * time.Second: "just now", 38 * time.Minute: "38 min ago", 2 * time.Hour: "2 h ago", 30 * time.Hour: "yesterday", 80 * time.Hour: "3 days ago",
 	} {
-		if got := ago(n.Add(-d), n); got != want {
-			t.Errorf("ago(%v) = %q", d, got)
-		}
+		t.Run(want, func(t *testing.T) {
+			if got := ago(n.Add(-d), n); got != want {
+				t.Fatalf("ago = %q", got)
+			}
+		})
 	}
+}
+
+func TestANameIsShownAsTwoInitials(t *testing.T) {
 	for name, want := range map[string]string{"joris jonkers": "JJ", "developer": "DE", "ExtraToast": "EX", "": "", "a b c": "AB"} {
-		if got := initials(name); got != want {
-			t.Errorf("initials(%q) = %q", name, got)
-		}
+		t.Run(name, func(t *testing.T) {
+			if got := initials(name); got != want {
+				t.Fatalf("initials = %q", got)
+			}
+		})
 	}
+}
+
+func TestNumbersDurationsAndURLsAreShownShort(t *testing.T) {
 	if num(1284) != "1,284" || num(-1234567) != "-1,234,567" || minSec(102000) != "1:42" || pct(1, 0) != 0 || shortURL("https://www.tribelt.nl/x") != "tribelt.nl/x" {
 		t.Fatal("number formatting")
 	}
+}
+
+func TestTheAppVersionsAreShownAsARange(t *testing.T) {
 	if versionsText(nil) != "unknown" || versionsText([]string{"0.1.0", "0.2.0", "0.3.0"}) != "v0.1.0 → v0.3.0" || Summary("v0.3.0", "v1") != "v0.3.0 · v1" {
 		t.Fatal("versions")
 	}
@@ -66,55 +85,95 @@ func TestLabelsAndColours(t *testing.T) {
 	}
 }
 
-func TestCharts(t *testing.T) {
+func TestAChartsTopIsTheNextRoundNumber(t *testing.T) {
 	for v, want := range map[int64]int64{0: 4, 3: 4, 7: 8, 9: 20, 120: 200, 150: 200, 401: 800, 1000: 1000, 4999: 8000} {
-		if got := niceTop(v); got != want {
-			t.Errorf("niceTop(%d) = %d, want %d", v, got, want)
-		}
+		t.Run(strconv.FormatInt(v, 10), func(t *testing.T) {
+			if got := niceTop(v); got != want {
+				t.Fatalf("niceTop = %d, want %d", got, want)
+			}
+		})
 	}
-	days := ParseFilter(url.Values{"from": {"2026-09-01"}, "to": {"2026-09-30"}}, now()).Days()
-	if ticks := tickDays(days); len(ticks) != 5 || ticks[0] != "1 Sep" || ticks[4] != "30 Sep" {
+}
+
+func september() []time.Time {
+	return ParseFilter(url.Values{"from": {"2026-09-01"}, "to": {"2026-09-30"}}, now()).Days()
+}
+
+func TestAMonthIsLabelledAtFiveDays(t *testing.T) {
+	if ticks := tickDays(september()); len(ticks) != 5 || ticks[0] != "1 Sep" || ticks[4] != "30 Sep" {
 		t.Fatalf("ticks %v", ticks)
 	}
-	if len(tickDays(days[:3])) != 3 {
-		t.Fatal("few days show every day")
+}
+
+func TestAFewDaysAreEachLabelled(t *testing.T) {
+	if n := len(tickDays(september()[:3])); n != 3 {
+		t.Fatalf("ticks %d", n)
 	}
-	one := stackData{
-		days: days[:1], by: map[string][]int64{"human": {3}}, kinds: []visits.Kind{visits.KindHuman, visits.KindAICrawler},
+}
+
+// oneDay is a timeline of a single day, with a marker on it and one before the range.
+func oneDay() stackData {
+	days := september()
+	return stackData{
+		days: days[:1], by: map[string][]int64{"human": {3}, "ai-crawler": {1}}, kinds: []visits.Kind{visits.KindHuman, visits.KindAICrawler},
 		markers: []Marker{{Day: days[0], Label: "v1 & co", Version: "0.1.0"}, {Day: at(400), Label: "gone"}},
 	}
-	one.by["ai-crawler"] = []int64{1}
-	svg := TimelineSVG("t <x>", one)
+}
+
+func TestATimelineEscapesItsTextAndLeavesOutMarkersBeforeIt(t *testing.T) {
+	svg := TimelineSVG("t <x>", oneDay())
 	if !strings.Contains(svg, "t &lt;x&gt;") || !strings.Contains(svg, "v1 &amp; co") || strings.Contains(svg, "gone") || !strings.HasSuffix(svg, "</svg>") {
-		t.Fatal("escaping and markers outside the range")
+		t.Fatal(svg)
 	}
-	areas, top := one.areas()
+}
+
+func TestASingleDaySpansTheWholePlot(t *testing.T) {
+	areas, top := oneDay().areas()
 	if len(areas) != 2 || top != 4 || !strings.HasPrefix(areas[0].D, "M0.0,") || !strings.Contains(areas[0].D, "L1000.0,") {
-		t.Fatalf("a single day spans the plot: %+v", areas)
+		t.Fatalf("areas %+v", areas)
 	}
-	late := one
-	late.markers = []Marker{{Day: days[0], Label: "late"}}
-	late.days = days
-	late.by = map[string][]int64{"human": make([]int64, 30), "ai-crawler": make([]int64, 30)}
-	late.markers[0].Day = days[29]
+}
+
+func TestAMarkerOnTheRightIsLabelledLeftwards(t *testing.T) {
+	days := september()
+	late := stackData{
+		days: days, kinds: []visits.Kind{visits.KindHuman, visits.KindAICrawler},
+		by:      map[string][]int64{"human": make([]int64, 30), "ai-crawler": make([]int64, 30)},
+		markers: []Marker{{Day: days[29], Label: "late"}},
+	}
 	if !strings.Contains(TimelineSVG("late", late), `text-anchor="end"`) {
-		t.Fatal("a marker on the right labels leftwards")
+		t.Fatal("labelled rightwards")
 	}
+}
+
+func TestAnEmptySparklineStillDrawsALine(t *testing.T) {
 	if s := spark(nil, 200, 40); s.Line == "" || !strings.HasSuffix(s.Area, "Z") {
-		t.Fatal("empty sparkline")
+		t.Fatalf("spark %+v", s)
 	}
+}
+
+func TestPartsWithoutDataMakeNoSegments(t *testing.T) {
 	if segments([]part{{"a", "#000", 0}}, 1) != nil {
-		t.Fatal("no segments without data")
+		t.Fatal("segments")
 	}
+}
+
+func TestEachPartWithDataGetsASegmentSizedToItsShare(t *testing.T) {
 	segs := segments([]part{{"a", "#000", 1}, {"b", "#fff", 0}, {"c", "#111", 3}}, 0.5)
 	if len(segs) != 2 || segs[1].X != 125 || !strings.Contains(segs[1].Title, "75%") {
 		t.Fatalf("segments %+v", segs)
 	}
+}
+
+func TestABarChartEscapesItsLabelsAndDrawsWithNoRows(t *testing.T) {
 	bars := BarsSVG("b", barRows([]BarRow{{Label: "<search>", N: 5, Color: colBlue}, {Label: "x", N: 0}}))
 	if !strings.Contains(bars, "&lt;search&gt;") || !strings.Contains(BarsSVG("none", nil), "</svg>") {
 		t.Fatal("bars")
 	}
-	daySVG := DaySVG("d", days[:2], []DaySeries{{Label: "Clicks", Color: colGreen, Values: []int64{1, 2}}})
+}
+
+func TestADayChartDrawsAColumnPerDayAndSeries(t *testing.T) {
+	daySVG := DaySVG("d", september()[:2], []DaySeries{{Label: "Clicks", Color: colGreen, Values: []int64{1, 2}}})
 	if strings.Count(daySVG, "<rect") != 3 {
 		t.Fatalf("day columns: %s", daySVG)
 	}

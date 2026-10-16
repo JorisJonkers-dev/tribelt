@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,30 +32,41 @@ func TestParseServiceAccount(t *testing.T) {
 	}
 }
 
-func TestValidators(t *testing.T) {
+func TestAnAPIKeyIsTwentyTo256CharactersWithoutSpaces(t *testing.T) {
 	for s, want := range map[string]bool{
 		"0123456789abcdef0123": true, "short": false, "has space in it 12345": false, strings.Repeat("a", 257): false,
 	} {
-		if ValidAPIKey(s) != want {
-			t.Errorf("ValidAPIKey(%q)", s)
-		}
-	}
-	if !ValidZoneID(strings.Repeat("ab", 16)) || ValidZoneID(strings.Repeat("AB", 16)) || ValidZoneID("abc") {
-		t.Fatal("zone ids are 32 lowercase hex")
-	}
-	key, err := NewIndexNowKey()
-	if err != nil || len(key) != 32 || !ValidIndexNowKey(key) || ValidIndexNowKey("robots") || ValidIndexNowKey("a/b.txtxxxx") {
-		t.Fatalf("indexnow key %q %v", key, err)
-	}
-	if k, ok := ParseKind("cloudflare"); !ok || k != Cloudflare {
-		t.Fatal("known kind")
-	}
-	if _, ok := ParseKind("vault"); ok {
-		t.Fatal("unknown kind")
+		t.Run(s, func(t *testing.T) {
+			if ValidAPIKey(s) != want {
+				t.Fatalf("ValidAPIKey = %v", !want)
+			}
+		})
 	}
 }
 
-func TestCodes(t *testing.T) {
+func TestAZoneIDIs32LowercaseHex(t *testing.T) {
+	if !ValidZoneID(strings.Repeat("ab", 16)) || ValidZoneID(strings.Repeat("AB", 16)) || ValidZoneID("abc") {
+		t.Fatal("zone ids are 32 lowercase hex")
+	}
+}
+
+func TestANewIndexNowKeyIsAValid32CharacterKey(t *testing.T) {
+	key, err := NewIndexNowKey()
+	if err != nil || len(key) != 32 || !ValidIndexNowKey(key) || ValidIndexNowKey("robots") || ValidIndexNowKey("a/b.txtxxxx") {
+		t.Fatalf("key %q %v", key, err)
+	}
+}
+
+func TestOnlyAKnownKindParses(t *testing.T) {
+	if k, ok := ParseKind("cloudflare"); !ok || k != Cloudflare {
+		t.Fatal("known kind refused")
+	}
+	if _, ok := ParseKind("vault"); ok {
+		t.Fatal("unknown kind parsed")
+	}
+}
+
+func TestEveryCodeHasItsOwnMessage(t *testing.T) {
 	all := []Code{
 		CodeInvalid, CodeInvalidJSON, CodeNotServiceAccount, CodeIncompleteKey, CodeTooLarge, CodeNoStorage, CodeNotConfigured,
 		CodeNoTarget, CodeTargetMissing, CodeKeyChanged, CodeAuth, CodeForbidden, CodeNotFound, CodeRateLimited,
@@ -68,17 +80,31 @@ func TestCodes(t *testing.T) {
 		}
 		seen[m] = true
 	}
+}
+
+func TestAnUnknownCodeShowsAFixedText(t *testing.T) {
 	if Code("<script>").Message() != "Something went wrong." {
-		t.Fatal("unknown codes render a fixed text")
+		t.Fatal(Code("<script>").Message())
 	}
+}
+
+func TestAProviderStatusMapsToItsCode(t *testing.T) {
 	for status, want := range map[int]Code{401: CodeAuth, 403: CodeForbidden, 404: CodeNotFound, 429: CodeRateLimited, 503: CodeProviderDown, 400: CodeBadResponse} {
-		if statusCode(status) != want {
-			t.Errorf("%d", status)
-		}
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			if got := statusCode(status); got != want {
+				t.Fatalf("statusCode = %s", got)
+			}
+		})
 	}
+}
+
+func TestTheCodeOfAnErrorIsFoundThroughItsWrapping(t *testing.T) {
 	if CodeOf(nil) != "" || CodeOf(errors.New("x")) != CodeInternal || CodeOf(fmt.Errorf("w: %w", Fail(CodeBusy))) != CodeBusy {
 		t.Fatal("CodeOf")
 	}
+}
+
+func TestACodedErrorReadsAsItsCodeAndDetail(t *testing.T) {
 	f := &CodedError{Code: CodeAuth, Err: errors.New("detail")}
 	if f.Error() != "auth_failed: detail" || Fail(CodeBusy).Error() != "busy" || !errors.Is(f, f.Err) {
 		t.Fatal("CodedError text")

@@ -41,7 +41,7 @@ func TestSealRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSealTamperDetection(t *testing.T) {
+func TestATamperedCredentialDoesNotOpen(t *testing.T) {
 	s := sealer(t, testKey)
 	blob, _ := s.Seal(Bing, []byte("bing-api-key-value"))
 	for name, mutate := range map[string]func([]byte) []byte{
@@ -50,12 +50,19 @@ func TestSealTamperDetection(t *testing.T) {
 		"truncated":          func(b []byte) []byte { return b[:5] },
 		"empty":              func([]byte) []byte { return nil },
 	} {
-		if _, err := s.Open(Bing, s.KeyID(), mutate(bytes.Clone(blob))); !errors.Is(err, ErrTampered) {
-			t.Errorf("%s: %v", name, err)
-		}
+		t.Run(name, func(t *testing.T) {
+			if _, err := s.Open(Bing, s.KeyID(), mutate(bytes.Clone(blob))); !errors.Is(err, ErrTampered) {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	}
+}
+
+func TestASealedCredentialCannotMoveToAnotherKind(t *testing.T) {
+	s := sealer(t, testKey)
+	blob, _ := s.Seal(Bing, []byte("bing-api-key-value"))
 	if _, err := s.Open(Cloudflare, s.KeyID(), blob); !errors.Is(err, ErrTampered) {
-		t.Fatalf("a blob cannot move to another kind: %v", err)
+		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -83,7 +90,7 @@ func TestSealWrongKey(t *testing.T) {
 	}
 }
 
-func TestFingerprint(t *testing.T) {
+func TestAFingerprintIsShortStableAndRevealsNothing(t *testing.T) {
 	f := Fingerprint([]byte("secret"))
 	if len(f) != 12 || f != Fingerprint([]byte("secret")) || f == Fingerprint([]byte("secret2")) || strings.Contains(f, "secret") {
 		t.Fatalf("fingerprint %q", f)

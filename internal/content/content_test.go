@@ -70,32 +70,57 @@ func appendTo(m fstest.MapFS, file, extra string) {
 
 const product = "pages/nl/transportbanden--draadogenbanden.md"
 
-func TestLoadFixture(t *testing.T) {
+func TestTheFixtureLoadsEveryPageWithItsRelease(t *testing.T) {
 	c := loadFixture(t)
 	if len(c.Pages) != 8 || c.Site.Release.Label != "v1-fixture" || len(c.Hash) != 16 {
 		t.Fatalf("pages=%d release=%s hash=%s", len(c.Pages), c.Site.Release.Label, c.Hash)
 	}
-	p := c.ByPath["/transportbanden/draadogenbanden"]
+}
+
+func TestAPageListsItsTranslations(t *testing.T) {
+	p := loadFixture(t).ByPath["/transportbanden/draadogenbanden"]
 	if p == nil || len(p.Alternates) != 2 || p.Alternates[0].Locale != "nl" || p.Alternates[1].Locale != "en" {
 		t.Fatalf("alternates: %+v", p)
 	}
-	if got, ok := c.Resolve("/producten"); !ok || got.Path != "/metalen-transportbanden" {
-		t.Fatal("redirect chains resolve")
+}
+
+func TestARedirectChainResolvesToItsPage(t *testing.T) {
+	if got, ok := loadFixture(t).Resolve("/producten"); !ok || got.Path != "/metalen-transportbanden" {
+		t.Fatalf("Resolve = %+v, %v", got, ok)
 	}
-	if _, ok := c.Resolve("/missing"); ok {
-		t.Fatal("unknown path")
+}
+
+func TestAnUnknownPathDoesNotResolve(t *testing.T) {
+	if _, ok := loadFixture(t).Resolve("/missing"); ok {
+		t.Fatal("resolved")
 	}
+}
+
+func TestEachLocaleHasAHomeAndAnUnknownLocaleHasNothing(t *testing.T) {
+	c := loadFixture(t)
 	if c.Home("de").Path != "/de" || c.InLocale("home", "xx") != nil || c.Home("xx") != nil {
 		t.Fatal("lookups")
 	}
+}
+
+func TestAPathsLocaleIsItsFirstSegmentOrDutch(t *testing.T) {
 	for path, want := range map[string]string{"/": "nl", "/en": "en", "/en/x": "en", "/de/x": "de", "/enx": "nl", "/details": "nl"} {
-		if LocaleOf(path) != want {
-			t.Fatalf("LocaleOf(%s)", path)
-		}
+		t.Run(path, func(t *testing.T) {
+			if got := LocaleOf(path); got != want {
+				t.Fatalf("LocaleOf = %s, want %s", got, want)
+			}
+		})
 	}
-	if p.Hash() == c.ByPath["/en/conveyor-belts/eye-link-belts"].Hash() {
-		t.Fatal("page hashes differ per page")
+}
+
+func TestEachPageHasItsOwnHash(t *testing.T) {
+	c := loadFixture(t)
+	if c.ByPath["/transportbanden/draadogenbanden"].Hash() == c.ByPath["/en/conveyor-belts/eye-link-belts"].Hash() {
+		t.Fatal("two pages share a hash")
 	}
+}
+
+func TestAWordCountSkipsMarkdownSyntax(t *testing.T) {
 	body := "## Kop\n\nEen twee drie.\n\n- vier\n- vijf\n\n| a | b |\n| - | - |\n| zes | zeven |"
 	if n := WordCount(body); n != 10 {
 		t.Fatalf("word count %d", n)
@@ -219,11 +244,25 @@ func TestLoadWithoutRedirects(t *testing.T) {
 
 var ldRe = regexp.MustCompile(`(?s)<script type="application/ld\+json">(.*?)</script>`)
 
-func TestBuildPage(t *testing.T) {
-	b := buildFixture(t)
-	res := b.HTML["/transportbanden/draadogenbanden"]
-	doc := html(res)
-	for _, want := range []string{
+// productPage is the built HTML of the fixture's Dutch product page, signed out and as a human.
+func productPage(t *testing.T) (*Resource, string) {
+	t.Helper()
+	res := buildFixture(t).HTML["/transportbanden/draadogenbanden"]
+	return res, html(res)
+}
+
+func contains(t *testing.T, doc string, wants ...string) {
+	t.Helper()
+	for _, want := range wants {
+		if !strings.Contains(doc, want) {
+			t.Errorf("page lacks %s", want)
+		}
+	}
+}
+
+func TestAPageHeadNamesItsCanonicalURLAndEveryTranslation(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc,
 		`<html lang="nl">`,
 		`<link rel="canonical" href="https://mirror.test/transportbanden/draadogenbanden">`,
 		`<link rel="alternate" hreflang="nl" href="https://mirror.test/transportbanden/draadogenbanden">`,
@@ -231,45 +270,86 @@ func TestBuildPage(t *testing.T) {
 		`<link rel="alternate" hreflang="en" href="https://mirror.test/en/conveyor-belts/eye-link-belts">`,
 		`<meta property="og:type" content="product">`,
 		`<meta property="og:image" content="https://mirror.test/images/product.webp">`,
-		`data-hit="HIT"`,
+		`<link rel="preload" as="image" href="/images/product.webp" imagesrcset="/images/product-480.webp 480w`,
+	)
+}
+
+func TestAProductPageShowsItsSpecificationsQuestionsAndSizedImages(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc,
 		`<th scope="row">Breedte</th><td>40–6500 mm</td>`,
 		`<details>`,
+		`srcset="/images/product-480.webp 480w`,
+		`width="480" height="320"`,
+	)
+}
+
+func TestLinksToTheOfficialSiteGoThroughTheRedirectorAsNofollow(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc,
 		`href="/go?from=%2Ftransportbanden%2Fdraadogenbanden&amp;to=https%3A%2F%2Fwww.tribelt.nl%2Fcontact" rel="nofollow">Offerte`,
 		`<a href="/go?from=%2Ftransportbanden%2Fdraadogenbanden&amp;to=https%3A%2F%2Fwww.tribelt.nl%2Ftransportbanden%2Fdraadogenbanden" rel="nofollow">Deze pagina op tribelt.nl</a>`,
 		`<a href="https://www.tribelt.nl">Officiële site</a>`,
 		`<a href="/privacyverklaring">Privacy</a>`,
 		`<li><a href="/metalen-transportbanden">Metalen transportbanden</a></li>`,
-		`srcset="/images/product-480.webp 480w`,
-		`width="480" height="320"`,
-		`<aside class="testbar" aria-label="studententestsite">`,
-		`Studieproject: dit is een testsite, niet de officiële website van Tribelt.`,
+	)
+}
+
+func TestAPageUsesTheMirrorDesign(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc,
+		`data-hit="HIT"`,
 		`<a class="btn-pill btn-pill-dark" href="/go?from=%2Ftransportbanden%2Fdraadogenbanden&amp;to=https%3A%2F%2Fwww.tribelt.nl%2Fcontact" rel="nofollow">`,
 		`<a class="btn-pill btn-pill-orange" href="/go?from=%2Ftransportbanden%2Fdraadogenbanden&amp;to=https%3A%2F%2Fwww.tribelt.nl%2Fcontact" rel="nofollow">`,
 		`<section class="hero hero-split">`,
 		`<span class="brand-tag">mirror</span>`,
+		`<aside class="notice" aria-label="Melding">`,
+		`aria-label="Melding sluiten"`,
+	)
+}
+
+func TestEveryPageSaysItIsAStudentTestSite(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc,
+		`<aside class="testbar" aria-label="studententestsite">`,
+		`Studieproject: dit is een testsite, niet de officiële website van Tribelt.`,
+	)
+	if strings.Contains(doc, "Studententestsite, niet de officiële site van Tribelt.") {
+		t.Error("the footer note is still there beside the test-site bar")
+	}
+}
+
+func TestAPageOffersAgentsItsTextVersions(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc,
 		`<nav aria-label="Voor agents">`,
 		`<li><a href="/llms.txt" type="text/plain">llms.txt</a></li>`,
 		`<li><a href="/transportbanden/draadogenbanden.md" type="text/markdown">Markdown-versie</a></li>`,
 		`<li><a href="/sitemap.xml" type="application/xml">Sitemap</a></li>`,
-		`<aside class="notice" aria-label="Melding">`,
-		`aria-label="Melding sluiten"`,
-		`href="/auth/login?next=/stats" rel="nofollow" aria-label="Inloggen"`,
-		`<link rel="preload" as="image" href="/images/product.webp" imagesrcset="/images/product-480.webp 480w`,
-	} {
-		if !strings.Contains(doc, want) {
-			t.Errorf("page lacks %s", want)
-		}
-	}
-	if strings.Contains(doc, "Studententestsite, niet de officiële site van Tribelt.") {
-		t.Error("the footer note is replaced by the test-site bar")
-	}
+	)
+}
+
+func TestASignedOutVisitorIsOfferedTheSignIn(t *testing.T) {
+	_, doc := productPage(t)
+	contains(t, doc, `href="/auth/login?next=/stats" rel="nofollow" aria-label="Inloggen"`)
+}
+
+func TestAStatsViewerGetsTheStatsButtonInsteadOfTheSignIn(t *testing.T) {
+	res, _ := productPage(t)
 	signedIn := string(bytes.Join(res.Parts("HIT", true, true), nil))
 	if !strings.Contains(signedIn, `<a class="auth" href="/stats" rel="nofollow" aria-label="Statistieken">`) || strings.Contains(signedIn, "/auth/login") {
-		t.Error("a Stats Viewer gets the stats button")
+		t.Fatal("no stats button, or a sign-in link")
 	}
-	if strings.Contains(doc, AuthPlaceholder) || strings.Contains(doc, HitPlaceholder) {
-		t.Error("placeholders are replaced")
+}
+
+func TestNoPlaceholderIsLeftInABuiltPage(t *testing.T) {
+	if _, doc := productPage(t); strings.Contains(doc, AuthPlaceholder) || strings.Contains(doc, HitPlaceholder) {
+		t.Fatal("a placeholder is left")
 	}
+}
+
+func TestAProductPageDescribesTheProductAndAnswersInStructuredData(t *testing.T) {
+	_, doc := productPage(t)
 	var ld struct {
 		Graph []map[string]any `json:"@graph"`
 	}
@@ -283,9 +363,12 @@ func TestBuildPage(t *testing.T) {
 	}
 	faq := ld.Graph[2]["mainEntity"].([]any)[0].(map[string]any)["acceptedAnswer"].(map[string]any)["text"]
 	if faq != "Ja, tot hoge temperaturen. Zie ook tribelt.nl." {
-		t.Fatalf("FAQ answer is plain text: %q", faq)
+		t.Fatalf("FAQ answer is not plain text: %q", faq)
 	}
-	if res.PageID != "transportbanden--draadogenbanden" || res.Locale != "nl" || res.Format != "html" {
+}
+
+func TestABuiltPageKnowsItsPageLocaleAndFormat(t *testing.T) {
+	if res, _ := productPage(t); res.PageID != "transportbanden--draadogenbanden" || res.Locale != "nl" || res.Format != "html" {
 		t.Fatalf("resource meta %+v", res)
 	}
 }
@@ -379,95 +462,112 @@ func TestBuildLastModFromDatabase(t *testing.T) {
 	}
 }
 
-func TestBuildErrors(t *testing.T) {
+func TestABrokenTemplateFailsTheBuild(t *testing.T) {
 	c := loadFixture(t)
-	opts := buildOpts(t, os.DirFS("testdata/content/images"))
-	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}no placeholder{{end}}{{define "notfound"}}{{end}}`)}}
-	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "placeholder") {
-		t.Fatalf("placeholder: %v", err)
-	}
-	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Hit}}{{end}}{{define "notfound"}}x{{end}}`)}}
-	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "auth placeholder") {
-		t.Fatalf("auth placeholder: %v", err)
-	}
-	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Hit}}{{.Auth}}{{end}}`)}}
-	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "authbutton") {
-		t.Fatalf("missing auth button template: %v", err)
-	}
-	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Hit}}{{.Auth}}{{end}}{{define "authbutton"}}b{{end}}{{define "notfound"}}x{{end}}`)}}
-	if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "404") {
-		t.Fatalf("404 placeholder: %v", err)
-	}
-	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{define "page"}}{{.Nope}}{{end}}`)}}
-	if _, err := Build(c, opts); err == nil {
-		t.Fatal("template execution error")
-	}
-	opts.Templates = fstest.MapFS{"public.html": {Data: []byte(`{{`)}}
-	if _, err := Build(c, opts); err == nil {
-		t.Fatal("template parse error")
-	}
-	if _, err := Build(c, buildOpts(t, fstest.MapFS{})); err == nil || !strings.Contains(err.Error(), "image") {
-		t.Fatalf("missing image file: %v", err)
-	}
-	opts = buildOpts(t, os.DirFS("testdata/content/images"))
-	opts.Static = fstest.MapFS{"x.css": {Data: []byte("a")}}
-	if _, err := Build(c, opts); err != nil {
-		t.Fatalf("static without site.css still builds: %v", err)
+	for _, tc := range []struct{ name, template, says string }{
+		{"no hit placeholder", `{{define "page"}}no placeholder{{end}}{{define "notfound"}}{{end}}`, "placeholder"},
+		{"no auth placeholder", `{{define "page"}}{{.Hit}}{{end}}{{define "notfound"}}x{{end}}`, "auth placeholder"},
+		{"no auth button", `{{define "page"}}{{.Hit}}{{.Auth}}{{end}}`, "authbutton"},
+		{"no 404 placeholder", `{{define "page"}}{{.Hit}}{{.Auth}}{{end}}{{define "authbutton"}}b{{end}}{{define "notfound"}}x{{end}}`, "404"},
+		{"an execution error", `{{define "page"}}{{.Nope}}{{end}}`, ""},
+		{"a parse error", `{{`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := buildOpts(t, os.DirFS("testdata/content/images"))
+			opts.Templates = fstest.MapFS{"public.html": {Data: []byte(tc.template)}}
+			if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), tc.says) {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	}
 }
 
-func TestDesignImages(t *testing.T) {
-	c := loadFixture(t)
+func TestAMissingImageFailsTheBuild(t *testing.T) {
+	if _, err := Build(loadFixture(t), buildOpts(t, fstest.MapFS{})); err == nil || !strings.Contains(err.Error(), "image") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestStaticFilesWithoutSiteCSSStillBuild(t *testing.T) {
 	opts := buildOpts(t, os.DirFS("testdata/content/images"))
+	opts.Static = fstest.MapFS{"x.css": {Data: []byte("a")}}
+	if _, err := Build(loadFixture(t), opts); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+const designCredit = "- id: home\n  src: img/home.webp\n  alt: {nl: Hal, en: Hall, de: Halle}\n  credit: \"Foto: Tribelt\"\n"
+
+// withDesign builds the fixture with a design hero image, described by credits.
+func withDesign(t *testing.T, credits string) (*Built, error) {
+	t.Helper()
 	webp, err := fs.ReadFile(os.DirFS("testdata/content/images"), "product.webp")
 	if err != nil {
 		t.Fatal(err)
 	}
-	entry := "- id: home\n  src: img/home.webp\n  alt: {nl: Hal, en: Hall, de: Halle}\n  credit: \"Foto: Tribelt\"\n"
-	static := fstest.MapFS{"site.css": {Data: []byte("a{}")}, "img/home.webp": {Data: webp}, "img/home-480.webp": {Data: webp}, "img/credits.yml": {Data: []byte(entry)}}
-	opts.Static = static
-	b, err := Build(c, opts)
+	opts := buildOpts(t, os.DirFS("testdata/content/images"))
+	opts.Static = fstest.MapFS{"site.css": {Data: []byte("a{}")}, "img/home.webp": {Data: webp}, "img/home-480.webp": {Data: webp}, "img/credits.yml": {Data: []byte(credits)}}
+	return Build(loadFixture(t), opts)
+}
+
+func TestADesignImageIsTheHeroWithItsSizesAndAlt(t *testing.T) {
+	b, err := withDesign(t, designCredit)
 	if err != nil {
 		t.Fatal(err)
 	}
-	en := html(b.HTML["/en"])
-	for _, want := range []string{`<img class="hero-img" src="/static/img/home.webp" srcset="/static/img/home-480.webp 480w, /static/img/home.webp 480w"`, `alt="Hall"`} {
-		if !strings.Contains(en, want) {
-			t.Errorf("design hero lacks %s", want)
-		}
+	contains(t, html(b.HTML["/en"]),
+		`<img class="hero-img" src="/static/img/home.webp" srcset="/static/img/home-480.webp 480w, /static/img/home.webp 480w"`,
+		`alt="Hall"`,
+	)
+}
+
+func TestTheCreditsListIsNotServed(t *testing.T) {
+	b, err := withDesign(t, designCredit)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if b.Assets["/static/img/credits.yml"] != nil {
-		t.Error("the credits list is not served")
-	}
-	for name, yml := range map[string]string{
-		"missing file": strings.Replace(entry, "img/home.webp", "img/nope.webp", 1),
-		"missing alt":  strings.Replace(entry, "de: Halle", "de: \"\"", 1),
-		"unknown key":  entry + "  nope: x\n",
-	} {
-		static["img/credits.yml"] = &fstest.MapFile{Data: []byte(yml)}
-		if _, err := Build(c, opts); err == nil || !strings.Contains(err.Error(), "credits.yml") {
-			t.Errorf("%s: %v", name, err)
-		}
+		t.Fatal("served")
 	}
 }
 
-func TestSplit(t *testing.T) {
+func TestABrokenCreditsListFailsTheBuild(t *testing.T) {
+	for name, yml := range map[string]string{
+		"missing file": strings.Replace(designCredit, "img/home.webp", "img/nope.webp", 1),
+		"missing alt":  strings.Replace(designCredit, "de: Halle", "de: \"\"", 1),
+		"unknown key":  designCredit + "  nope: x\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := withDesign(t, yml); err == nil || !strings.Contains(err.Error(), "credits.yml") {
+				t.Fatalf("err = %v", err)
+			}
+		})
+	}
+}
+
+// sample is a page with every marker, split into its parts.
+func sample(t *testing.T) *Resource {
+	t.Helper()
 	segs, err := split([]byte("a" + HumanStart + "b" + HitPlaceholder + HumanEnd + "c" + AuthPlaceholder + HumanStart + "d" + HumanEnd))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &Resource{segments: segs, SignedOut: []byte("[out]"), SignedIn: []byte("[in]")}
-	for _, c := range []struct {
-		signedIn, human bool
-		want            string
-	}{
-		{false, true, "abHITc[out]d"},
-		{true, false, "ac[in]"},
-	} {
-		if got := string(bytes.Join(r.Parts("HIT", c.signedIn, c.human), nil)); got != c.want {
-			t.Errorf("Parts(%v, %v) = %q, want %q", c.signedIn, c.human, got, c.want)
-		}
+	return &Resource{segments: segs, SignedOut: []byte("[out]"), SignedIn: []byte("[in]")}
+}
+
+func TestASignedOutHumanGetsTheHumanPartsTheHitAndTheSignIn(t *testing.T) {
+	if got := string(bytes.Join(sample(t).Parts("HIT", false, true), nil)); got != "abHITc[out]d" {
+		t.Fatalf("Parts = %q", got)
 	}
+}
+
+func TestASignedInVisitorWhoIsNotHumanGetsNoHumanPartsButTheirButton(t *testing.T) {
+	if got := string(bytes.Join(sample(t).Parts("HIT", true, false), nil)); got != "ac[in]" {
+		t.Fatalf("Parts = %q", got)
+	}
+}
+
+func TestAPageWithMissingOrUnpairedMarkersCannotBeSplit(t *testing.T) {
 	for _, bad := range []string{
 		"no placeholders",
 		HitPlaceholder,
@@ -476,8 +576,10 @@ func TestSplit(t *testing.T) {
 		HitPlaceholder + AuthPlaceholder + HumanEnd,
 		HitPlaceholder + AuthPlaceholder + HumanStart + HumanStart + HumanEnd,
 	} {
-		if _, err := split([]byte(bad)); err == nil {
-			t.Errorf("split(%q) accepted", bad)
-		}
+		t.Run(bad, func(t *testing.T) {
+			if _, err := split([]byte(bad)); err == nil {
+				t.Fatal("split")
+			}
+		})
 	}
 }

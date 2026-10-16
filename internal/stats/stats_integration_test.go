@@ -1,3 +1,5 @@
+//go:build integration
+
 package stats
 
 import (
@@ -26,9 +28,6 @@ import (
 )
 
 // Fixed clock: noon on 30 Sept 2026, Amsterdam.
-func now() time.Time { return time.Date(2026, 9, 30, 12, 0, 0, 0, amsterdam()) }
-
-func at(daysAgo int) time.Time { return now().AddDate(0, 0, -daysAgo) }
 
 type seeded struct {
 	svc  *Service
@@ -162,47 +161,78 @@ func kpiByLabel(t *testing.T, kpis []KPI) map[string]KPI {
 	return out
 }
 
-func TestOverview(t *testing.T) {
-	s := seed(t)
-	o, err := s.svc.Overview(context.Background(), week())
+// overview is the seeded overview through filter f.
+func overview(t *testing.T, f Filter) *Overview {
+	t.Helper()
+	o, err := seed(t).svc.Overview(context.Background(), f)
 	if err != nil {
 		t.Fatal(err)
 	}
-	k := kpiByLabel(t, o.KPIs)
+	return o
+}
+
+func TestTheOverviewCountsHumanVisitorsAndTheirReturns(t *testing.T) {
 	// Visitors v-a and v-b plus one cookie-less Daily Visitor; nothing in the previous ten days.
-	if h := k["Human visitors"]; h.Value != "3" || h.Delta != "new" || h.Hint != "1 Returning Visitors" || h.Spark.Line == "" {
+	if h := kpiByLabel(t, overview(t, week()).KPIs)["Human visitors"]; h.Value != "3" || h.Delta != "new" || h.Hint != "1 Returning Visitors" || h.Spark.Line == "" {
 		t.Fatalf("human visitors %+v", h)
 	}
+}
+
+func TestTheOverviewCountsBotsWithTheirVerificationAndTopNames(t *testing.T) {
+	k := kpiByLabel(t, overview(t, week()).KPIs)
 	if k["AI crawler hits"].Value != "2" || k["AI crawler hits"].Hint != "100% verified against IP ranges" {
 		t.Fatalf("ai crawler %+v", k["AI crawler hits"])
 	}
 	if k["AI fetches"].Value != "1" || k["AI fetches"].Hint != "ChatGPT-User" || k["Search crawler hits"].Hint != "Googlebot" {
 		t.Fatalf("hints %+v %+v", k["AI fetches"], k["Search crawler hits"])
 	}
-	if out := k["Outbound Clicks"]; out.Value != "2" || out.Hint != "67% of Human visitors" {
+}
+
+func TestTheOverviewCountsOutboundClicksAsAShareOfVisitors(t *testing.T) {
+	if out := kpiByLabel(t, overview(t, week()).KPIs)["Outbound Clicks"]; out.Value != "2" || out.Hint != "67% of Human visitors" {
 		t.Fatalf("outbound %+v", out)
 	}
+}
+
+func fetchedRows(o *Overview) map[string]FetchRow {
 	fetched := map[string]FetchRow{}
 	for _, f := range o.Fetched {
 		fetched[f.Resource] = f
 	}
+	return fetched
+}
+
+func TestTheOverviewHasARowForEveryResourceClass(t *testing.T) {
+	o := overview(t, week())
 	if len(o.Fetched) != len(visits.Resources()) {
-		t.Fatalf("one row per resource class: %d", len(o.Fetched))
+		t.Fatalf("rows %d", len(o.Fetched))
 	}
+	fetched := fetchedRows(o)
 	for res, want := range map[string]string{"page": "5", "markdown": "2", "llms": "1", "sitemap": "1", "image": "1", "not_found": "1", "outbound": "2", "robots": "0"} {
 		if fetched[res].Total != want {
 			t.Errorf("%s: %s, want %s", res, fetched[res].Total, want)
 		}
 	}
+}
+
+func TestAResourceRowNamesWhoFetchedItMostAndAnExample(t *testing.T) {
+	fetched := fetchedRows(overview(t, week()))
 	if p := fetched["page"]; p.Top != "Browsers" || p.TopShare != "80% of requests" || p.Example != "/sectoren" || len(p.Segs) != 3 {
 		t.Fatalf("page row %+v", p)
 	}
 	if out := fetched["outbound"]; out.Example != "/go → tribelt.nl/contact" || out.TopShare != "100% of clicks" {
 		t.Fatalf("outbound row %+v", out)
 	}
-	if fetched["robots"].Segs != nil || fetched["robots"].Top != "—" {
-		t.Fatal("empty resource")
+}
+
+func TestAResourceNobodyFetchedHasAnEmptyRow(t *testing.T) {
+	if r := fetchedRows(overview(t, week()))["robots"]; r.Segs != nil || r.Top != "—" {
+		t.Fatalf("robots %+v", r)
 	}
+}
+
+func TestTheOverviewSharesArrivalsOverEveryChannel(t *testing.T) {
+	o := overview(t, week())
 	arrive := map[string]BarRow{}
 	for _, a := range o.Arrive {
 		arrive[a.Key] = a
@@ -210,6 +240,10 @@ func TestOverview(t *testing.T) {
 	if len(o.Arrive) != 7 || arrive["search"].Share != "25%" || arrive["social"].N != 0 || arrive["search"].W != 100 {
 		t.Fatalf("arrive %+v", o.Arrive)
 	}
+}
+
+func TestTheOverviewListsBotsPagesSearchAndATimeline(t *testing.T) {
+	o := overview(t, week())
 	if o.Bots[0].Kind != "ai-crawler" || o.Bots[0].Verified != "100%" || o.Bots[0].Pages != "1" || o.Bots[4].Hits != "2" {
 		t.Fatalf("bots %+v", o.Bots)
 	}
@@ -221,46 +255,32 @@ func TestOverview(t *testing.T) {
 	}
 }
 
-func TestOverviewFilters(t *testing.T) {
-	s := seed(t)
-	total := func(f Filter) int64 {
-		o, err := s.svc.Overview(context.Background(), f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return o.Timeline.Total
-	}
-	f := week()
-	f.IncludeInternal = true
-	if total(f) != 11 {
-		t.Fatal("include-internal counts the internal hit")
-	}
-	for name, mutate := range map[string]func(*Filter){
-		"release": func(f *Filter) { f.Release = "v1-baseline" },
-		"version": func(f *Filter) { f.Version = "0.1.0" },
+func TestAFilterNarrowsTheOverviewTimeline(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		filter func(*Filter)
+		want   int64
+	}{
+		{"with internal hits", func(f *Filter) { f.IncludeInternal = true }, 11},
+		{"by release", func(f *Filter) { f.Release = "v1-baseline" }, 4},
+		{"by app version", func(f *Filter) { f.Version = "0.1.0" }, 4},
+		{"by release tag", func(f *Filter) { f.Tag = "longtail-keywords" }, 6},
+		{"by a locale with no hits", func(f *Filter) { f.Locale = "de" }, 0},
 	} {
-		f := week()
-		mutate(&f)
-		if got := total(f); got != 4 {
-			t.Errorf("%s filter: %d", name, got)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			f := week()
+			tc.filter(&f)
+			if got := overview(t, f).Timeline.Total; got != tc.want {
+				t.Fatalf("total %d, want %d", got, tc.want)
+			}
+		})
 	}
-	f = week()
-	f.Tag = "longtail-keywords"
-	if got := total(f); got != 6 {
-		t.Fatalf("tag filter: %d", got)
-	}
-	f = week()
-	f.Locale = "de"
-	if total(f) != 0 {
-		t.Fatal("locale filter")
-	}
-	f = week()
+}
+
+func TestFirstTouchArrivalsHiddenKindsAndShareScaleShapeTheOverview(t *testing.T) {
+	f := week()
 	f.Arrive, f.Hide, f.Scale = "first", []string{"human"}, "share"
-	o, err := s.svc.Overview(context.Background(), f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	o := overview(t, f)
 	if o.Arrive[0].Key != "search" || o.Arrive[0].N != 1 || len(o.Timeline.Areas) != 6 || !o.Timeline.Chips[0].Off {
 		t.Fatalf("first touch %+v, areas %d", o.Arrive, len(o.Timeline.Areas))
 	}
@@ -293,12 +313,22 @@ func TestPagesAndDetail(t *testing.T) {
 	}
 }
 
-func TestReleases(t *testing.T) {
-	s := seed(t)
+// releases is the seeded releases view over the last 60 days, compared as f's A and B.
+func releases(t *testing.T, a, b string) *ReleasesView {
+	t.Helper()
 	f := ParseFilter(url.Values{"from": {at(60).Format(time.DateOnly)}}, now())
-	v, err := s.svc.Releases(context.Background(), f)
-	if err != nil || len(v.Rows) != 2 {
-		t.Fatalf("%v %v", v, err)
+	f.A, f.B = a, b
+	v, err := seed(t).svc.Releases(context.Background(), f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestEachReleaseHasItsFiguresOverTheDaysItWasLive(t *testing.T) {
+	v := releases(t, "", "")
+	if len(v.Rows) != 2 {
+		t.Fatalf("rows %d", len(v.Rows))
 	}
 	v1, v2 := v.Rows[0], v.Rows[1]
 	if v1.ReleaseLabel != "v1-baseline" || v1.Days != 4 || v1.HumanOut != 1 || v1.Impr != 40 || v1.FromSearch != 2 || v1.Versions() != "v0.1.0" {
@@ -307,30 +337,41 @@ func TestReleases(t *testing.T) {
 	if v2.ReleaseLabel != "v2-longtail" || v2.Impr != 15 || v2.AIPerDay != 1 || v2.Outbound != 1 || v2.Markdown != 2 || v2.Llms != 1 || v2.Release.Tags[0] != "longtail-keywords" {
 		t.Fatalf("v2 %+v", v2)
 	}
-	c := v.Compare
+}
+
+func TestTheLatestReleaseIsComparedWithThePreviousOne(t *testing.T) {
+	c := releases(t, "", "").Compare
 	if c.A.ReleaseLabel != "v1-baseline" || c.B.ReleaseLabel != "v2-longtail" || len(c.Metrics) != 14 || len(c.Changes) != 1 || c.Unchanged != 0 {
 		t.Fatalf("compare %+v", c)
 	}
 	if ch := c.Changes[0]; ch.TitleA != "Title v1-baseline" || ch.TitleB != "Title v2-longtail" || ch.Added || ch.Removed {
 		t.Fatalf("change %+v", ch)
 	}
-	f.A, f.B = "v2-longtail", "v2-longtail"
-	v, _ = s.svc.Releases(context.Background(), f)
-	if len(v.Compare.Changes) != 0 || v.Compare.Unchanged != 1 {
-		t.Fatal("a release compared with itself changes nothing")
-	}
-	f.A, f.B = "unknown", "v1-baseline"
-	if v, _ = s.svc.Releases(context.Background(), f); v.Compare.A.ReleaseLabel != "v1-baseline" {
-		t.Fatal("unknown labels fall back to the previous release")
+}
+
+func TestAReleaseComparedWithItselfChangesNothing(t *testing.T) {
+	if c := releases(t, "v2-longtail", "v2-longtail").Compare; len(c.Changes) != 0 || c.Unchanged != 1 {
+		t.Fatalf("compare %+v", c)
 	}
 }
 
-func TestAgents(t *testing.T) {
-	s := seed(t)
-	a, err := s.svc.Agents(context.Background(), week())
+func TestAnUnknownReleaseToCompareFallsBackToThePreviousOne(t *testing.T) {
+	if c := releases(t, "unknown", "v1-baseline").Compare; c.A.ReleaseLabel != "v1-baseline" {
+		t.Fatalf("A = %s", c.A.ReleaseLabel)
+	}
+}
+
+func agents(t *testing.T, f Filter) *Agents {
+	t.Helper()
+	a, err := seed(t).svc.Agents(context.Background(), f)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return a
+}
+
+func TestEachBotIsListedWithItsOperatorVerificationAndWhatItRead(t *testing.T) {
+	a := agents(t, week())
 	if len(a.Bots) != 6 {
 		t.Fatalf("bots %d", len(a.Bots))
 	}
@@ -347,33 +388,49 @@ func TestAgents(t *testing.T) {
 	if c := by["curl"]; c.VerifiedText != "no ranges" || c.VerifiedTone != "none" {
 		t.Fatalf("curl %+v", c)
 	}
+}
+
+func TestTheAgentFilesShowHowOftenEachWasFetched(t *testing.T) {
 	files := map[string]AgentFile{}
-	for _, f := range a.Files {
+	for _, f := range agents(t, week()).Files {
 		files[f.Name] = f
 	}
 	if files["llms.txt"].Hits != "1" || files[".md twins"].Hint != "2 of 124 pages fetched as Markdown" || files["robots.txt"].Hint != "Fetched by 0 distinct agents" {
 		t.Fatalf("files %+v", files)
 	}
-	if a.Formats[0].Pct != "20%" || a.Formats[1].Pct != "40%" || len(a.Fetchers) != 1 || a.Fetchers[0].Format != "md" {
+}
+
+func TestAgentsAreSharedOverTheFormatsTheyFetched(t *testing.T) {
+	if a := agents(t, week()); a.Formats[0].Pct != "20%" || a.Formats[1].Pct != "40%" || len(a.Fetchers) != 1 || a.Fetchers[0].Format != "md" {
 		t.Fatalf("formats %+v fetchers %+v", a.Formats, a.Fetchers)
-	}
-	f := week()
-	f.Kind = "other"
-	if a, _ = s.svc.Agents(context.Background(), f); len(a.Bots) != 2 || !a.Kinds[4].On {
-		t.Fatalf("kind filter: %d", len(a.Bots))
 	}
 }
 
-func TestSearchView(t *testing.T) {
-	s := seed(t)
-	v, err := s.svc.SearchPerformance(context.Background(), week())
+func TestAKindFilterListsOnlyThatKindsBots(t *testing.T) {
+	f := week()
+	f.Kind = "other"
+	if a := agents(t, f); len(a.Bots) != 2 || !a.Kinds[4].On {
+		t.Fatalf("bots %d", len(a.Bots))
+	}
+}
+
+func searchView(t *testing.T) *SearchView {
+	t.Helper()
+	v, err := seed(t).svc.SearchPerformance(context.Background(), week())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(v.Tiles) != 2 || v.Tiles[0].Name != "Bing" || v.Tiles[1].CTR != "6.0%" || len(v.Pages) != 1 || v.Pages[0].Title != "Sectoren | Tribelt" {
+	return v
+}
+
+func TestTheSearchViewHasATilePerSourceAndThePagesFound(t *testing.T) {
+	if v := searchView(t); len(v.Tiles) != 2 || v.Tiles[0].Name != "Bing" || v.Tiles[1].CTR != "6.0%" || len(v.Pages) != 1 || v.Pages[0].Title != "Sectoren | Tribelt" {
 		t.Fatalf("search %+v", v)
 	}
-	if v.Impressions.Total != "55" || v.Clicks.Total != "3" || len(v.Impressions.Cols) != 10 {
+}
+
+func TestTheSearchViewTotalsImpressionsAndClicksPerDay(t *testing.T) {
+	if v := searchView(t); v.Impressions.Total != "55" || v.Clicks.Total != "3" || len(v.Impressions.Cols) != 10 {
 		t.Fatalf("bars %+v", v.Impressions)
 	}
 }
@@ -506,16 +563,5 @@ func TestSQLiteExport(t *testing.T) {
 	_ = db.QueryRow(`SELECT count(*) FROM hits WHERE visitor LIKE 'v-%' OR daily_visitor LIKE 'd/%'`).Scan(&leaked)
 	if leaked != 0 {
 		t.Fatal("identifiers are pseudonymised")
-	}
-}
-
-func TestBrowserFamily(t *testing.T) {
-	for ua, want := range map[string]string{
-		"Mozilla/5.0 Chrome/140 Safari/537.36 Edg/140": "Edge", "Mozilla/5.0 Firefox/142": "Firefox", "Mozilla/5.0 Version/18 Safari/604.1": "Safari",
-		"curl/8": "other", "Mozilla/5.0 Chrome/1 Safari/1 OPR/1": "Opera",
-	} {
-		if BrowserFamily(ua) != want {
-			t.Errorf("%s -> %s", ua, BrowserFamily(ua))
-		}
 	}
 }

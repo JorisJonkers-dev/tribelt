@@ -7,7 +7,7 @@ import (
 )
 
 // TestReleaseTags loads site.yml with each release block fixture in place of the fixture's own.
-func TestReleaseTags(t *testing.T) {
+func TestAReleaseReadsItsLabelNoteAndTags(t *testing.T) {
 	for file, want := range map[string]Release{
 		"tags-block.yml": {Label: "v2-longtail-keywords", Note: "Product titles lead with the long-tail term", Tags: []string{"longtail-keywords", "faq-schema"}},
 		"tags-flow.yml":  {Label: "v3-faq", Note: "FAQ schema on every product page", Tags: []string{"faq-schema"}},

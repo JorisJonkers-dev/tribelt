@@ -32,7 +32,7 @@ func mustRanges(t *testing.T) *Ranges {
 	return r
 }
 
-func TestClassifyCorpus(t *testing.T) {
+func TestEachUserAgentIsClassifiedAsItsVisitorKind(t *testing.T) {
 	r := mustRanges(t)
 	cases := []struct {
 		name, ua, ip string
@@ -134,43 +134,62 @@ func TestClassifyCorpus(t *testing.T) {
 	}
 }
 
-func TestClaimedBot(t *testing.T) {
+func TestACrawlerTokenNamesTheBotItClaimsToBe(t *testing.T) {
 	if name, kind, ok := ClaimedBot("Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)"); !ok || name != "GPTBot" || kind != KindAICrawler {
-		t.Fatalf("GPTBot: %s %s %v", name, kind, ok)
+		t.Fatalf("ClaimedBot = %s %s %v", name, kind, ok)
 	}
+}
+
+func TestABrowserClaimsNoCrawler(t *testing.T) {
 	if _, _, ok := ClaimedBot("Mozilla/5.0 Chrome/140.0 Safari/537.36"); ok {
-		t.Fatal("a browser claims no crawler")
+		t.Fatal("a browser claimed a crawler")
 	}
 }
 
-func TestKinds(t *testing.T) {
+func TestThereAreSevenVisitorKinds(t *testing.T) {
 	if len(Kinds()) != 7 {
-		t.Fatal("seven Visitor Kinds")
-	}
-	for _, k := range Kinds() {
-		if k.IsHuman() != (k == KindHuman || k == KindHumanUnconfirmed) {
-			t.Fatalf("IsHuman(%s)", k)
-		}
+		t.Fatalf("Kinds = %v", Kinds())
 	}
 }
 
-func TestRangesContains(t *testing.T) {
-	r := mustRanges(t)
-	if len(r.Operators()) != 7 {
+func TestOnlyTheHumanKindsAreHuman(t *testing.T) {
+	for _, k := range Kinds() {
+		t.Run(string(k), func(t *testing.T) {
+			if k.IsHuman() != (k == KindHuman || k == KindHumanUnconfirmed) {
+				t.Fatalf("IsHuman = %v", k.IsHuman())
+			}
+		})
+	}
+}
+
+func TestSevenOperatorsPublishTheirRanges(t *testing.T) {
+	if r := mustRanges(t); len(r.Operators()) != 7 {
 		t.Fatalf("operators = %v", r.Operators())
 	}
-	if !r.Contains("google", netip.MustParseAddr("::ffff:"+googleIP)) {
-		t.Fatal("IPv4-mapped IPv6 should unmap")
+}
+
+func TestAnIPv4MappedAddressMatchesItsIPv4Range(t *testing.T) {
+	if !mustRanges(t).Contains("google", netip.MustParseAddr("::ffff:"+googleIP)) {
+		t.Fatal("no match")
 	}
-	if r.Contains("google", netip.Addr{}) {
-		t.Fatal("invalid address never matches")
+}
+
+func TestAnInvalidAddressMatchesNoRange(t *testing.T) {
+	if mustRanges(t).Contains("google", netip.Addr{}) {
+		t.Fatal("matched")
 	}
-	var nilRanges *Ranges
-	if nilRanges.Contains("google", netip.MustParseAddr(googleIP)) {
-		t.Fatal("nil ranges never match")
+}
+
+func TestNoRangesMatchNothing(t *testing.T) {
+	var none *Ranges
+	if none.Contains("google", netip.MustParseAddr(googleIP)) {
+		t.Fatal("matched")
 	}
-	if r.Contains("nobody", netip.MustParseAddr(googleIP)) {
-		t.Fatal("unknown operator never matches")
+}
+
+func TestAnUnknownOperatorMatchesNothing(t *testing.T) {
+	if mustRanges(t).Contains("nobody", netip.MustParseAddr(googleIP)) {
+		t.Fatal("matched")
 	}
 }
 
@@ -199,7 +218,7 @@ type unreadable struct {
 
 func (u unreadable) ReadFile(string) ([]byte, error) { return nil, errors.New("boom") }
 
-func TestBrowsing(t *testing.T) {
+func TestOnlyABrowserLoadingADocumentIsBrowsing(t *testing.T) {
 	const chrome = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 	cases := []struct {
 		ua, dest string
@@ -218,8 +237,10 @@ func TestBrowsing(t *testing.T) {
 		{"", "document", false},
 	}
 	for _, c := range cases {
-		if got := Browsing(c.ua, c.dest); got != c.want {
-			t.Errorf("Browsing(%q, %q) = %v, want %v", c.ua, c.dest, got, c.want)
-		}
+		t.Run(c.ua+" "+c.dest, func(t *testing.T) {
+			if got := Browsing(c.ua, c.dest); got != c.want {
+				t.Fatalf("Browsing(%q, %q) = %v, want %v", c.ua, c.dest, got, c.want)
+			}
+		})
 	}
 }

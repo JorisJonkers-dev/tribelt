@@ -59,7 +59,7 @@ func serve(h http.Handler, method, target string, header map[string]string) (*ht
 	return rec, info
 }
 
-func TestPages(t *testing.T) {
+func TestEachRequestGetsItsPageTwinFileRedirectOrNotFound(t *testing.T) {
 	h := &Handler{Built: built(t)}
 	cases := []struct {
 		name, method, target string
@@ -137,7 +137,7 @@ func TestTwinHeadersAndETag(t *testing.T) {
 	}
 }
 
-func TestWantsMarkdown(t *testing.T) {
+func TestMarkdownIsServedOnlyWhenPreferredOverHTML(t *testing.T) {
 	for accept, want := range map[string]bool{
 		"":                                   false,
 		"text/markdown":                      true,
@@ -151,40 +151,58 @@ func TestWantsMarkdown(t *testing.T) {
 		"application/xhtml+xml, text/markdown;q=0.8": false,
 		"garbage;;;": false,
 	} {
-		if WantsMarkdown(accept) != want {
-			t.Errorf("WantsMarkdown(%q) != %v", accept, want)
-		}
+		t.Run(accept, func(t *testing.T) {
+			if WantsMarkdown(accept) != want {
+				t.Fatalf("WantsMarkdown = %v", !want)
+			}
+		})
 	}
 }
 
-func TestAssets(t *testing.T) {
-	b := built(t)
-	a := Assets(b)
-	do := func(method, target, inm string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(method, target, nil)
-		if inm != "" {
-			req.Header.Set("If-None-Match", inm)
-		}
-		rec := httptest.NewRecorder()
-		a.ServeHTTP(rec, req)
-		return rec
+func asset(t *testing.T, method, target, ifNoneMatch string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, target, nil)
+	if ifNoneMatch != "" {
+		req.Header.Set("If-None-Match", ifNoneMatch)
 	}
-	rec := do("GET", b.AssetURL("/static/site.css"), "")
+	rec := httptest.NewRecorder()
+	Assets(built(t)).ServeHTTP(rec, req)
+	return rec
+}
+
+func TestAVersionedStylesheetIsCachedForever(t *testing.T) {
+	rec := asset(t, "GET", built(t).AssetURL("/static/site.css"), "")
 	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" || rec.Header().Get("Content-Type") != "text/css; charset=utf-8" {
-		t.Fatalf("versioned css %d %v", rec.Code, rec.Header())
+		t.Fatalf("css %d %v", rec.Code, rec.Header())
 	}
-	img := do("GET", "/images/product.webp", "")
-	if img.Header().Get("Cache-Control") != "public, max-age=86400" || img.Header().Get("Content-Type") != "image/webp" {
+}
+
+func TestAnImageIsCachedForADay(t *testing.T) {
+	if img := asset(t, "GET", "/images/product.webp", ""); img.Header().Get("Cache-Control") != "public, max-age=86400" || img.Header().Get("Content-Type") != "image/webp" {
 		t.Fatalf("image %v", img.Header())
 	}
-	if do("GET", "/images/product.webp", img.Header().Get("ETag")).Code != http.StatusNotModified {
-		t.Fatal("asset 304")
+}
+
+func TestAnUnchangedAssetAnswersNotModified(t *testing.T) {
+	etag := asset(t, "GET", "/images/product.webp", "").Header().Get("ETag")
+	if asset(t, "GET", "/images/product.webp", etag).Code != http.StatusNotModified {
+		t.Fatal("no 304")
 	}
-	if do("HEAD", "/images/product.webp", "").Body.Len() != 0 {
-		t.Fatal("HEAD")
+}
+
+func TestAHeadRequestForAnAssetHasNoBody(t *testing.T) {
+	if asset(t, "HEAD", "/images/product.webp", "").Body.Len() != 0 {
+		t.Fatal("a body")
 	}
-	if do("GET", "/images/credits.yml", "").Code != 404 || do("GET", "/static/nope.js", "").Code != 404 {
-		t.Fatal("unknown assets 404")
+}
+
+func TestAnUnknownAssetIsNotFound(t *testing.T) {
+	for _, target := range []string{"/images/credits.yml", "/static/nope.js"} {
+		t.Run(target, func(t *testing.T) {
+			if asset(t, "GET", target, "").Code != 404 {
+				t.Fatal("served")
+			}
+		})
 	}
 }
 
