@@ -212,7 +212,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@8637ee1224dfefd807d9b8be616eeb59f94ba126 # v0.23.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@7f5f8d1d1362bf0f94fd07b164b8d05ad03c1b8f # v0.24.0
     with:
       project-file: deploy/tribelt.project.yml
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
