@@ -432,40 +432,50 @@ func TestLogoutAllEndsOnlyTribeltSessions(t *testing.T) {
 	waitRevoked(t, f, "rt-2")
 }
 
-func TestCallbackRejects(t *testing.T) {
+// callback signs in up to the issuer's redirect and returns the auth mux, the flow's state and its
+// cookie, with change applied to the issuer before the callback.
+func callback(t *testing.T, change func(*fakeIssuer)) (*http.ServeMux, string, *http.Cookie) {
+	t.Helper()
 	f := newFakeIssuer(t)
 	f.next = map[string]any{"roles": []string{"ROLE_ADMIN"}}
 	_, mux, _, _ := newAuth(t, f)
-
 	state, flowC := login(t, f, mux)
-	if rec := do(mux, "GET", "/auth/callback?code=good-code&state=wrong", flowC); rec.Code != http.StatusBadRequest {
-		t.Fatalf("bad state: %d", rec.Code)
+	if change != nil {
+		f.set(change)
 	}
-	if rec := do(mux, "GET", "/auth/callback?code=good-code&state="+state); rec.Code != http.StatusBadRequest {
-		t.Fatalf("no flow cookie: %d", rec.Code)
-	}
-	bad := *flowC
-	bad.Value = "garbage"
-	if rec := do(mux, "GET", "/auth/callback?code=good-code&state="+state, &bad); rec.Code != http.StatusBadRequest {
-		t.Fatalf("bad flow cookie: %d", rec.Code)
-	}
-	if rec := do(mux, "GET", "/auth/callback?error=access_denied&state="+state, flowC); rec.Code != http.StatusForbidden {
-		t.Fatalf("issuer error: %d", rec.Code)
-	}
-	if rec := do(mux, "GET", "/auth/callback?code=bad-code&state="+state, flowC); rec.Code != http.StatusBadGateway {
-		t.Fatalf("exchange failure: %d", rec.Code)
-	}
+	return mux, state, flowC
+}
 
-	state, flowC = login(t, f, mux)
-	f.set(func(f *fakeIssuer) { f.nonce = "replayed" })
-	if rec := do(mux, "GET", "/auth/callback?code=good-code&state="+state, flowC); rec.Code != http.StatusBadRequest {
-		t.Fatalf("bad nonce: %d", rec.Code)
-	}
-
-	state, flowC = login(t, f, mux)
-	f.set(func(f *fakeIssuer) { f.audience = "someone-else" })
-	if rec := do(mux, "GET", "/auth/callback?code=good-code&state="+state, flowC); rec.Code != http.StatusBadRequest {
-		t.Fatalf("wrong audience: %d", rec.Code)
+func TestACallbackIsRefused(t *testing.T) {
+	garbage := func(c *http.Cookie) *http.Cookie { bad := *c; bad.Value = "garbage"; return &bad }
+	for _, tc := range []struct {
+		name   string
+		change func(*fakeIssuer)
+		query  func(state string) string
+		cookie func(*http.Cookie) *http.Cookie
+		want   int
+	}{
+		{"with another state", nil, func(string) string { return "code=good-code&state=wrong" }, nil, http.StatusBadRequest},
+		{"without the flow cookie", nil, func(s string) string { return "code=good-code&state=" + s }, func(*http.Cookie) *http.Cookie { return nil }, http.StatusBadRequest},
+		{"with a forged flow cookie", nil, func(s string) string { return "code=good-code&state=" + s }, garbage, http.StatusBadRequest},
+		{"when the issuer denies access", nil, func(s string) string { return "error=access_denied&state=" + s }, nil, http.StatusForbidden},
+		{"when the code exchange fails", nil, func(s string) string { return "code=bad-code&state=" + s }, nil, http.StatusBadGateway},
+		{"with a replayed nonce", func(f *fakeIssuer) { f.nonce = "replayed" }, func(s string) string { return "code=good-code&state=" + s }, nil, http.StatusBadRequest},
+		{"for another audience", func(f *fakeIssuer) { f.audience = "someone-else" }, func(s string) string { return "code=good-code&state=" + s }, nil, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mux, state, flowC := callback(t, tc.change)
+			if tc.cookie != nil {
+				flowC = tc.cookie(flowC)
+			}
+			var cookies []*http.Cookie
+			if flowC != nil {
+				cookies = append(cookies, flowC)
+			}
+			if rec := do(mux, "GET", "/auth/callback?"+tc.query(state), cookies...); rec.Code != tc.want {
+				t.Fatalf("callback = %d, want %d", rec.Code, tc.want)
+			}
+		})
 	}
 }
 
@@ -490,21 +500,26 @@ func TestRequireRedirectsAnonymous(t *testing.T) {
 	}
 }
 
-func TestSafeNext(t *testing.T) {
+func TestAfterSignInOnlyAStatsPathIsFollowed(t *testing.T) {
 	for in, want := range map[string]string{
 		"/stats/pages?x=1": "/stats/pages?x=1", "": "/stats", "https://evil.test/stats": "/stats", "//evil.test": "/stats",
 		"/": "/stats", "/stats\\evil": "/stats",
 	} {
-		if got := safeNext(in); got != want {
-			t.Fatalf("safeNext(%q) = %q", in, got)
-		}
+		t.Run(in, func(t *testing.T) {
+			if got := safeNext(in); got != want {
+				t.Fatalf("safeNext = %q, want %q", got, want)
+			}
+		})
 	}
+}
+
+func TestOfNothingButEmptyStringsTheFirstNonEmptyIsEmpty(t *testing.T) {
 	if firstNonEmpty("", "") != "" {
 		t.Fatal("firstNonEmpty")
 	}
 }
 
-func TestDiscoveryFailure(t *testing.T) {
+func TestAnIssuerWithoutDiscoveryFailsTheStart(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	codec, _ := session.NewCodec(strings.Repeat("s", 64))
@@ -513,35 +528,60 @@ func TestDiscoveryFailure(t *testing.T) {
 	}
 }
 
-func TestDevBypass(t *testing.T) {
+var statsPage = httptest.NewRequest("GET", "/stats", nil)
+
+func TestTheDevBypassLetsAViewerOntoTheStatsOnly(t *testing.T) {
 	var g Gate = DevBypass{}
-	stats := httptest.NewRequest("GET", "/stats", nil)
-	if _, ok := g.Viewer(stats); !ok {
-		t.Fatal("dev viewer on stats")
+	if _, ok := g.Viewer(statsPage); !ok {
+		t.Fatal("no viewer on the stats")
 	}
 	if _, ok := g.Viewer(httptest.NewRequest("GET", "/", nil)); ok {
-		t.Fatal("public pages stay non-internal")
+		t.Fatal("a viewer on a public page")
 	}
-	if v, _ := g.Fresh(stats); !v.Admin || g.Session(stats) == "" {
-		t.Fatal("the bypass is an admin with a fixed session")
+}
+
+func TestTheDevBypassIsAnAdminWithAFixedSession(t *testing.T) {
+	var g Gate = DevBypass{}
+	if v, _ := g.Fresh(statsPage); !v.Admin || g.Session(statsPage) == "" {
+		t.Fatal("not an admin with a session")
 	}
-	if acc, sessions, ok := g.Account(stats); !ok || !acc.Admin || len(sessions) != 1 {
-		t.Fatal("the bypass has an account page")
+}
+
+func TestTheDevBypassHasAnAccountOnTheStatsOnly(t *testing.T) {
+	var g Gate = DevBypass{}
+	if acc, sessions, ok := g.Account(statsPage); !ok || !acc.Admin || len(sessions) != 1 {
+		t.Fatal("no account on the stats")
 	}
 	if _, _, ok := g.Account(httptest.NewRequest("GET", "/", nil)); ok {
-		t.Fatal("no account off the stats pages")
+		t.Fatal("an account off the stats")
 	}
+}
+
+func TestTheViewerDevBypassIsReadOnly(t *testing.T) {
 	ro := DevBypass{ReadOnly: true}
-	if v, _ := ro.Viewer(stats); v.Admin || ro.Session(httptest.NewRequest("GET", "/", nil)) != "" {
-		t.Fatal("DEV_AUTH_BYPASS=viewer is read-only")
+	if v, _ := ro.Viewer(statsPage); v.Admin || ro.Session(httptest.NewRequest("GET", "/", nil)) != "" {
+		t.Fatal("an admin, or a session off the stats")
 	}
+}
+
+// bypassed is a mux with the dev bypass's routes and a stats page behind it.
+func bypassed() *http.ServeMux {
+	var g Gate = DevBypass{}
 	mux := http.NewServeMux()
 	g.Routes(mux)
 	mux.Handle("/stats", g.Require(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })))
+	return mux
+}
+
+func TestTheDevBypassOpensTheStatsAndSignsOutToTheStart(t *testing.T) {
+	mux := bypassed()
 	if do(mux, "GET", "/stats").Code != 204 || do(mux, "POST", "/auth/logout").Code != http.StatusSeeOther || do(mux, "POST", "/auth/logout-all").Code != http.StatusSeeOther {
 		t.Fatal("bypass routes")
 	}
-	if rec := do(mux, "GET", "/auth/login?next=//evil.example"); rec.Code != http.StatusFound || rec.Header().Get("Location") != "/stats" {
-		t.Fatalf("bypass login goes to the stats: %d %s", rec.Code, rec.Header().Get("Location"))
+}
+
+func TestTheDevBypassSignInGoesToTheStatsWhateverItIsAsked(t *testing.T) {
+	if rec := do(bypassed(), "GET", "/auth/login?next=//evil.example"); rec.Code != http.StatusFound || rec.Header().Get("Location") != "/stats" {
+		t.Fatalf("login %d %s", rec.Code, rec.Header().Get("Location"))
 	}
 }

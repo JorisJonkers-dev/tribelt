@@ -86,7 +86,7 @@ func missingRoutes(c *Content, routes map[string]crawlPage) []string {
 }
 
 // TestRouteManifest: every official route must exist as a Mirror Page or a redirect to one.
-func TestRouteManifest(t *testing.T) {
+func TestEveryOfficialRouteHasAMirrorPageOrRedirect(t *testing.T) {
 	c, _ := loadReal(t)
 	routes := loadCrawl(t)
 	if missing := missingRoutes(c, routes); len(missing) > 0 {

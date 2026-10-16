@@ -2,7 +2,7 @@ package visits
 
 import "testing"
 
-func TestClassifyResource(t *testing.T) {
+func TestEachRequestIsClassifiedAsTheResourceItServed(t *testing.T) {
 	cases := []struct {
 		name, path, format string
 		status             int
@@ -58,7 +58,7 @@ func TestResourcesAreDistinct(t *testing.T) {
 	}
 }
 
-func TestOperator(t *testing.T) {
+func TestEachBotIsNamedForItsOperator(t *testing.T) {
 	for bot, want := range map[string]string{
 		"GPTBot": "OpenAI", "ChatGPT-User": "OpenAI", "OAI-SearchBot": "OpenAI", "ClaudeBot": "Anthropic",
 		"Claude-User": "Anthropic", "anthropic-ai": "Anthropic", "PerplexityBot": "Perplexity", "Googlebot": "Google",
@@ -66,8 +66,10 @@ func TestOperator(t *testing.T) {
 		"Applebot": "Apple", "CCBot": "Common Crawl", "AhrefsBot": "Ahrefs", "meta-externalagent": "Meta",
 		"curl": "", "": "", "ExampleBot": "",
 	} {
-		if got := Operator(bot); got != want {
-			t.Errorf("Operator(%q) = %q, want %q", bot, got, want)
-		}
+		t.Run(bot, func(t *testing.T) {
+			if got := Operator(bot); got != want {
+				t.Fatalf("Operator(%q) = %q, want %q", bot, got, want)
+			}
+		})
 	}
 }

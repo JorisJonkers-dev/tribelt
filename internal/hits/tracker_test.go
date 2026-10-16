@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -167,20 +168,24 @@ func TestNoCookieForBotsGPCAndDNT(t *testing.T) {
 	}
 }
 
-func TestCrawlerHit(t *testing.T) {
-	tr := newTracker(t)
-	_, op := request(tr, "/sectoren", map[string]string{"User-Agent": gptbot, "CF-Connecting-IP": "132.196.86.5", "Referer": "https://example.com/"})
-	h := op.Hit
-	if h.VisitorKind != "ai-crawler" || *h.BotName != "GPTBot" || !*h.Verified || h.ArrivalChannel != nil || *h.ReferrerHost != "example.com" {
-		t.Fatalf("verified crawler %+v", h)
+func TestACrawlerFromItsOperatorsRangeIsVerified(t *testing.T) {
+	_, op := request(newTracker(t), "/sectoren", map[string]string{"User-Agent": gptbot, "CF-Connecting-IP": "132.196.86.5", "Referer": "https://example.com/"})
+	if h := op.Hit; h.VisitorKind != "ai-crawler" || *h.BotName != "GPTBot" || !*h.Verified || h.ArrivalChannel != nil || *h.ReferrerHost != "example.com" {
+		t.Fatalf("hit %+v", h)
 	}
-	_, op = request(tr, "/sectoren", map[string]string{"User-Agent": gptbot, "CF-Connecting-IP": "203.0.113.9"})
+}
+
+func TestACrawlerFromOutsideItsOperatorsRangeIsAnUnverifiedBot(t *testing.T) {
+	_, op := request(newTracker(t), "/sectoren", map[string]string{"User-Agent": gptbot, "CF-Connecting-IP": "203.0.113.9"})
 	if op.Hit.VisitorKind != "other-bot" || *op.Hit.Verified {
-		t.Fatalf("spoofed crawler %+v", op.Hit)
+		t.Fatalf("hit %+v", op.Hit)
 	}
-	_, op = request(tr, "/sectoren", map[string]string{"User-Agent": "Mozilla/5.0 (compatible; AhrefsBot/7.0)"})
+}
+
+func TestACrawlerWithNoPublishedRangeIsNeitherVerifiedNorNot(t *testing.T) {
+	_, op := request(newTracker(t), "/sectoren", map[string]string{"User-Agent": "Mozilla/5.0 (compatible; AhrefsBot/7.0)"})
 	if op.Hit.VisitorKind != "seo-tool" || op.Hit.Verified != nil {
-		t.Fatalf("unverifiable crawler %+v", op.Hit)
+		t.Fatalf("hit %+v", op.Hit)
 	}
 }
 
@@ -235,61 +240,89 @@ func TestClientIP(t *testing.T) {
 	}
 }
 
-func TestBeacon(t *testing.T) {
+func postBeacon(tr *Tracker, body string) int {
+	rec := httptest.NewRecorder()
+	tr.Beacon(rec, httptest.NewRequest("POST", "/b", strings.NewReader(body)))
+	return rec.Code
+}
+
+func TestABeaconRecordsEngagementCappedAtSixHours(t *testing.T) {
 	tr := newTracker(t)
 	id := uuid.New()
-	post := func(body string) int {
-		rec := httptest.NewRecorder()
-		tr.Beacon(rec, httptest.NewRequest("POST", "/b", strings.NewReader(body)))
-		return rec.Code
+	if postBeacon(tr, `{"h":"`+id.String()+`","e":99999999999}`) != 204 {
+		t.Fatal("beacon did not answer 204")
 	}
-	if post(`{"h":"`+id.String()+`","e":99999999999}`) != 204 {
-		t.Fatal("beacon answers 204")
-	}
-	op := <-tr.Recorder.ch
-	if op.Beacon.ID != id || op.Beacon.EngagedMs != 6*3600*1000 || !op.Beacon.NotBefore.Equal(tr.Now().Add(-24*time.Hour)) {
+	if op := <-tr.Recorder.ch; op.Beacon.ID != id || op.Beacon.EngagedMs != 6*3600*1000 || !op.Beacon.NotBefore.Equal(tr.Now().Add(-24*time.Hour)) {
 		t.Fatalf("beacon %+v", op.Beacon)
-	}
-	post(`{"h":"` + id.String() + `","e":-5}`)
-	if op = <-tr.Recorder.ch; op.Beacon.EngagedMs != 0 {
-		t.Fatal("negative engagement clamps to 0")
-	}
-	for _, bad := range []string{"", "not json", `{"h":"nope"}`, strings.Repeat("x", 5000)} {
-		if post(bad) != 204 || len(tr.Recorder.ch) != 0 {
-			t.Fatalf("bad beacon %q must be ignored quietly", bad)
-		}
 	}
 }
 
-func TestGo(t *testing.T) {
+func TestNegativeEngagementIsRecordedAsNone(t *testing.T) {
 	tr := newTracker(t)
-	allowed := func(s string) bool { return strings.HasPrefix(s, "https://www.tribelt.nl/") }
-	h := tr.Go(allowed)
-	req := httptest.NewRequest("GET", "/go?to=https%3A%2F%2Fwww.tribelt.nl%2Fcontact&from=%2Fsectoren", nil)
-	req.Header.Set("User-Agent", chrome)
-	req.AddCookie(&http.Cookie{Name: visits.VisitorCookie, Value: "AAAAAAAAAAAAAAAAAAAAAA"})
+	postBeacon(tr, `{"h":"`+uuid.NewString()+`","e":-5}`)
+	if op := <-tr.Recorder.ch; op.Beacon.EngagedMs != 0 {
+		t.Fatalf("engaged %d", op.Beacon.EngagedMs)
+	}
+}
+
+func TestABadBeaconIsIgnoredQuietly(t *testing.T) {
+	for _, bad := range []string{"", "not json", `{"h":"nope"}`, strings.Repeat("x", 5000)} {
+		t.Run(bad, func(t *testing.T) {
+			tr := newTracker(t)
+			if postBeacon(tr, bad) != 204 || len(tr.Recorder.ch) != 0 {
+				t.Fatal("recorded or refused")
+			}
+		})
+	}
+}
+
+func toTribelt(s string) bool { return strings.HasPrefix(s, "https://www.tribelt.nl/") }
+
+// goFrom follows /go to target from page as userAgent, with a visitor cookie when visitor is set.
+func goFrom(tr *Tracker, target, from, userAgent, visitor string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest("GET", "/go?to="+url.QueryEscape(target)+"&from="+url.QueryEscape(from), nil)
+	req.Header.Set("User-Agent", userAgent)
+	if visitor != "" {
+		req.AddCookie(&http.Cookie{Name: visits.VisitorCookie, Value: visitor})
+	}
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
+	tr.Go(toTribelt).ServeHTTP(rec, req)
+	return rec
+}
+
+func TestALinkToTheOfficialSiteRedirectsThereUncached(t *testing.T) {
+	rec := goFrom(newTracker(t), "https://www.tribelt.nl/contact", "/sectoren", chrome, "")
 	if rec.Code != 302 || rec.Header().Get("Location") != "https://www.tribelt.nl/contact" || rec.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("go %d %v", rec.Code, rec.Header())
 	}
-	c := (<-tr.Recorder.ch).Click
-	if c.Target != "https://www.tribelt.nl/contact" || *c.PageID != "sectoren" || *c.Locale != "nl" || *c.VisitorID != "AAAAAAAAAAAAAAAAAAAAAA" || c.VisitorKind != "human-unconfirmed" {
+}
+
+func TestAClickIsRecordedWithItsPageLocaleAndVisitor(t *testing.T) {
+	tr := newTracker(t)
+	goFrom(tr, "https://www.tribelt.nl/contact", "/sectoren", chrome, "AAAAAAAAAAAAAAAAAAAAAA")
+	if c := (<-tr.Recorder.ch).Click; c.Target != "https://www.tribelt.nl/contact" || *c.PageID != "sectoren" || *c.Locale != "nl" || *c.VisitorID != "AAAAAAAAAAAAAAAAAAAAAA" || c.VisitorKind != "human-unconfirmed" {
 		t.Fatalf("click %+v", c)
 	}
-	if visitorCookie(rec) != nil {
-		t.Fatal("/go never issues a cookie")
+}
+
+func TestFollowingALinkNeverIssuesAVisitorCookie(t *testing.T) {
+	if rec := goFrom(newTracker(t), "https://www.tribelt.nl/contact", "/sectoren", chrome, ""); visitorCookie(rec) != nil {
+		t.Fatal("issued a cookie")
 	}
-	req = httptest.NewRequest("GET", "/go?to=https%3A%2F%2Fwww.tribelt.nl%2F&from=%2Funknown", nil)
-	req.Header.Set("User-Agent", gptbot)
-	h.ServeHTTP(httptest.NewRecorder(), req)
-	if c = (<-tr.Recorder.ch).Click; c.PageID != nil || c.VisitorKind != "other-bot" || c.Verified == nil {
-		t.Fatalf("bot click %+v", c)
+}
+
+func TestABotsClickFromAnUnknownPageIsRecordedAsTheBots(t *testing.T) {
+	tr := newTracker(t)
+	goFrom(tr, "https://www.tribelt.nl/", "/unknown", gptbot, "")
+	if c := (<-tr.Recorder.ch).Click; c.PageID != nil || c.VisitorKind != "other-bot" || c.Verified == nil {
+		t.Fatalf("click %+v", c)
 	}
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest("GET", "/go?to=https%3A%2F%2Fevil.example%2F", nil))
-	if rec.Code != 400 || len(tr.Recorder.ch) != 0 {
-		t.Fatal("off-site targets are refused and not recorded")
+}
+
+func TestALinkOffTheOfficialSiteIsRefusedAndNotRecorded(t *testing.T) {
+	tr := newTracker(t)
+	if rec := goFrom(tr, "https://evil.example/", "", chrome, ""); rec.Code != 400 || len(tr.Recorder.ch) != 0 {
+		t.Fatalf("go %d, recorded %d", rec.Code, len(tr.Recorder.ch))
 	}
 }
 

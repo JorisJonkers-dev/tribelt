@@ -1,3 +1,5 @@
+//go:build integration
+
 package pg_test
 
 import (

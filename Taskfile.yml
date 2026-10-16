@@ -33,8 +33,12 @@ tasks:
       - task: lint:actions
 
   lint:go:
-    desc: golangci-lint
-    cmd: golangci-lint run ./...
+    desc: golangci-lint under both build tags, and the estate test lints (tests named as behaviours, one t.Run per table row)
+    cmds:
+      - golangci-lint run ./...
+      - golangci-lint run --build-tags integration ./...
+      - go tool testlint ./...
+      - go tool testlint -tags integration ./...
 
   lint:sql:
     desc: Migration safety lint (squawk)
@@ -58,14 +62,19 @@ tasks:
     cmd: go vet ./...
 
   test:
-    desc: Go tests (race, real Postgres via testcontainers, real content/ gates) with a {{.COVERAGE_MIN}}% coverage gate
+    desc: Go unit and integration tests (race, real Postgres via testcontainers, real content/ gates) with a {{.COVERAGE_MIN}}% coverage gate
     deps: [css]
     cmds:
-      - go test -race -count=1 -covermode=atomic -coverpkg=./internal/... -coverprofile=coverage.out ./...
+      - go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./internal/... -coverprofile=coverage.out ./...
       - |
         total="$(go tool cover -func=coverage.out | awk '/^total:/ { sub("%", "", $3); print $3 }')"
         echo "coverage: ${total}% (minimum {{.COVERAGE_MIN}}%)"
         awk -v t="$total" -v m="{{.COVERAGE_MIN}}" 'BEGIN { exit !(t >= m) }'
+
+  test:unit:
+    desc: Go unit tests only; no Docker needed
+    deps: [css]
+    cmd: go test -race -count=1 ./...
 
   test:visits:
     desc: The pure classifier must stay at 100% coverage

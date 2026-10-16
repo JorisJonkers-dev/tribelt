@@ -183,7 +183,7 @@ func TestContentPRNotice(t *testing.T) {
 	}
 }
 
-func TestUsage(t *testing.T) {
+func TestAnUnknownModeFailsWithTheUsage(t *testing.T) {
 	t.Parallel()
 	r := newRepo(t, "v1-baseline")
 	if out, ok := r.gate(nil, "bogus"); ok || !strings.Contains(out, "usage:") {

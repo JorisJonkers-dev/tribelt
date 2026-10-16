@@ -85,20 +85,26 @@ func TestParseUTM(t *testing.T) {
 	}
 }
 
-func TestChannels(t *testing.T) {
+func TestThereAreSevenArrivalChannels(t *testing.T) {
 	if len(Channels()) != 7 {
 		t.Fatal("seven Arrival Channels")
 	}
 }
 
-func TestClean(t *testing.T) {
+func TestCleaningDropsNULBytes(t *testing.T) {
 	if got := Clean("a\x00b", 10); got != "ab" {
-		t.Fatalf("NUL: %q", got)
+		t.Fatalf("Clean = %q", got)
 	}
+}
+
+func TestCleaningNeverCutsACharacterInHalf(t *testing.T) {
 	if got := Clean("é", 1); got != "" {
-		t.Fatalf("cut rune: %q", got)
+		t.Fatalf("Clean = %q", got)
 	}
+}
+
+func TestCleaningDropsBytesThatAreNotUTF8(t *testing.T) {
 	if got := Clean("\xffok", 10); got != "ok" {
-		t.Fatalf("invalid: %q", got)
+		t.Fatalf("Clean = %q", got)
 	}
 }
