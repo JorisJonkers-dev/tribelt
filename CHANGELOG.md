@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.8.2...v0.9.0) (2026-10-16)
+
+
+### Features
+
+* let the Vault policy job generate the session and visitor keys ([#30](https://github.com/JorisJonkers-dev/tribelt/issues/30)) ([af6f02f](https://github.com/JorisJonkers-dev/tribelt/commit/af6f02f6d467d45d259c0d710415395e25fa942a))
+
 ## [0.8.2](https://github.com/JorisJonkers-dev/tribelt/compare/v0.8.1...v0.8.2) (2026-10-15)
 
 
