@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.9.0...v0.10.0) (2026-10-16)
+
+
+### Features
+
+* sign in to Postgres with the rotating login the edge derives ([#33](https://github.com/JorisJonkers-dev/tribelt/issues/33)) ([8f298f0](https://github.com/JorisJonkers-dev/tribelt/commit/8f298f061c4949701a3fb56cb375dc1a0c1712e8))
+
 ## [0.9.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.8.2...v0.9.0) (2026-10-16)
 
 
