@@ -29,17 +29,14 @@ applications:
           http: 8080
 
         dependsOn:
-          - { application: platform-postgres, surface: postgres }
+          # The login the edge derives: the owner role's, since tribelt migrates itself,
+          # issued by the Secret Store and rotated with a restart.
+          - application: platform-postgres
+            surface: postgres
+            credentials: { delivery: env, rotation: { tolerates: restart } }
           - { application: auth, surface: http }
 
         secrets:
-          # The login cluster.sh writes, until deploy-kit delivers an edge's credential
-          # (JorisJonkers-dev/deploy-kit#378).
-          - path: secret/data/tribelt-system/database
-            keys: [user, password]
-            access: read
-            delivery: env
-            rotation: { tolerates: restart }
           - path: secret/data/platform/tribelt
             # The search-console keys stay out until Vault holds them: tribelt runs without them.
             keys: [oidc.client_secret]
