@@ -42,7 +42,18 @@ applications:
             rotation: { tolerates: restart }
           - path: secret/data/platform/tribelt
             # The search-console keys stay out until Vault holds them: tribelt runs without them.
-            keys: [oidc.client_secret, session_key, visitor_hmac_key]
+            keys: [oidc.client_secret]
+            access: read
+            delivery: env
+            rotation: { tolerates: restart }
+          # The Vault policy job writes each key once, if absent, starting from the value
+          # the old path holds, and never overwrites it.
+          - path: secret/data/tribelt-system/keys
+            keys:
+              - name: session_key
+                generate: { adopt: "secret/data/platform/tribelt#session_key" }
+              - name: visitor_hmac_key
+                generate: { adopt: "secret/data/platform/tribelt#visitor_hmac_key" }
             access: read
             delivery: env
             rotation: { tolerates: restart }
