@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.10.0...v0.11.0) (2026-10-21)
+
+
+### Features
+
+* the images lock records the image's software version, through the shared lock step ([#37](https://github.com/JorisJonkers-dev/tribelt/issues/37)) ([2af8bc2](https://github.com/JorisJonkers-dev/tribelt/commit/2af8bc2efa8f0f06268740465c81411aa8f26930))
+
 ## [0.10.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.9.0...v0.10.0) (2026-10-16)
 
 
