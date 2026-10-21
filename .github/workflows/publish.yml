@@ -23,7 +23,7 @@ permissions: {}
 jobs:
   # -- 1. Build and push the multi-arch container image ----------------------
   publish-image:
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@1efce81af819868fb2f5fd99ee7b04a1275845d8 # v0.18.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@870429202376dac2e9434746941c54f9a2be605f # v0.33.0
     with:
       image-name: tribelt
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -103,39 +103,16 @@ jobs:
           path: platform/images.lock.json
           retention-days: 1
 
-      # The estate path's images lock share: the same digest, under the alias the
-      # project file names, with the user the image runs as, read from what was pushed.
+      # The estate path's images lock share: the same digest, under the alias the project file names,
+      # with the user the image runs as and the version it ships, read back from what was pushed.
       - name: lock-fragment-image
-        env:
-          IMAGE: ghcr.io/jorisjonkers-dev/tribelt
-          IMAGE_DIGEST: ${{ steps.digest.outputs.image-digest }}
-        run: |
-          set -euo pipefail
-          user="$(docker buildx imagetools inspect "${IMAGE}@${IMAGE_DIGEST}" --format '{{ json .Image }}' \
-            | jq -r 'if has("linux/amd64") then .["linux/amd64"] else . end | .config.User')"
-          case "$user" in
-            *[!0-9:]*|"") echo "::error::tribelt runs as '${user}', not a numeric uid[:gid]"; exit 1 ;;
-          esac
-          cat > images.lock.yml <<LOCK
-          apiVersion: lock.jorisjonkers.dev/v1
-          kind: ImagesLock
-          schemaVersion: 1.0.0
-          name: tribelt
-          images:
-            tribelt:
-              repository: ${IMAGE}
-              digest: "${IMAGE_DIGEST}"
-              uid: ${user%%:*}
-              gid: ${user##*:}
-          LOCK
-          cat images.lock.yml >> "$GITHUB_STEP_SUMMARY"
-
-      - name: upload-fragment-image-lock
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: JorisJonkers-dev/github-workflows/actions/resolve-image-lock@870429202376dac2e9434746941c54f9a2be605f # v0.33.0
         with:
-          name: fragment-images-lock-${{ github.run_id }}
-          path: images.lock.yml
-          retention-days: 1
+          name: tribelt
+          images: |
+            tribelt
+          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          artifact-name: fragment-images-lock-${{ github.run_id }}
 
   # -- 3. Render and publish the deploy artifact ----------------------------
   publish-deploy-artifact:
@@ -212,7 +189,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@362acd5420236edb73a797ece311c73c39510c25 # v0.27.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@79e57122f7ed1fb442c90a7487f861c5d1465ec6 # v0.34.0
     with:
       project-file: deploy/tribelt.project.yml
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
