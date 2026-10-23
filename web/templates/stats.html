@@ -141,7 +141,7 @@
   <a href="/stats/{{.View}}.csv?{{qs .Filter}}"><span class="flex flex-col gap-0.5"><span class="font-medium">{{.Title}}</span><span class="text-xs text-muted">This view's figures</span></span><span class="tag">CSV</span></a>
   {{if ne .View "overview"}}<a href="/stats/overview.csv?{{qs .Filter "path" ""}}"><span class="flex flex-col gap-0.5"><span class="font-medium">Overview</span><span class="text-xs text-muted">Daily totals by Visitor Kind</span></span><span class="tag">CSV</span></a>{{end}}
   <a href="/stats/hits.csv?{{qs .Filter}}"><span class="flex flex-col gap-0.5"><span class="font-medium">Raw Hits</span><span class="text-xs text-muted">One row per Hit, no raw IPs</span></span><span class="tag">CSV</span></a>
-  <a href="/stats/export.sqlite"><span class="flex flex-col gap-0.5"><span class="font-medium">Full database</span><span class="text-xs text-muted">Anonymised Hits, releases, pages, search data</span></span><span class="tag">SQLite</span></a>
+  <a href="/stats/export.sqlite"><span class="flex flex-col gap-0.5"><span class="font-medium">Full database</span><span class="text-xs text-muted">Everything except secrets: Hits, releases, pages, search, Cloudflare, integrations</span></span><span class="tag">SQLite</span></a>
 {{end}}
 
 {{define "bottom"}}
@@ -351,7 +351,7 @@
     <h2 class="h2">Exports</h2>
     <a href="/stats/overview.csv?{{qs $.Filter}}" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Overview</span><span class="text-xs text-muted">Daily totals by Visitor Kind</span></span><span class="tag">CSV</span></a>
     <a href="/stats/hits.csv?{{qs $.Filter}}" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Raw Hits</span><span class="text-xs text-muted">One row per Hit, no raw IPs</span></span><span class="tag">CSV</span></a>
-    <a href="/stats/export.sqlite" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Full database</span><span class="text-xs text-muted">Anonymised Hits, releases, pages, search data</span></span><span class="tag">SQLite</span></a>
+    <a href="/stats/export.sqlite" class="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-hair px-3 py-2.5 text-ink no-underline hover:border-strong hover:text-ink"><span class="flex flex-col gap-0.5"><span class="text-[13px] font-medium">Full database</span><span class="text-xs text-muted">Everything except secrets: Hits, releases, pages, search, Cloudflare, integrations</span></span><span class="tag">SQLite</span></a>
   </div>
 </section>
 {{end}}{{template "bottom" .}}{{end}}

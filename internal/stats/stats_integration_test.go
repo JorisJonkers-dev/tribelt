@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -563,5 +564,109 @@ func TestSQLiteExport(t *testing.T) {
 	_ = db.QueryRow(`SELECT count(*) FROM hits WHERE visitor LIKE 'v-%' OR daily_visitor LIKE 'd/%'`).Scan(&leaked)
 	if leaked != 0 {
 		t.Fatal("identifiers are pseudonymised")
+	}
+}
+
+// exportedDB downloads the SQLite export and opens it.
+func exportedDB(t *testing.T, s seeded) *sql.DB {
+	t.Helper()
+	rec := get(t, s, "/stats/export.sqlite")
+	if rec.Code != 200 {
+		t.Fatalf("export %d", rec.Code)
+	}
+	path := filepath.Join(t.TempDir(), "x.sqlite")
+	if err := os.WriteFile(path, rec.Body.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+func TestTheSQLiteExportCarriesTheIntegrationsAndAccountsButNoSecrets(t *testing.T) {
+	s := seed(t)
+	ctx := context.Background()
+	day := time.Date(2026, 9, 29, 0, 0, 0, 0, time.UTC)
+	for _, c := range []queries.UpsertCloudflareDailyParams{
+		{Host: "mirror.test", Day: day, Dimension: "total", Value: "", Requests: 120},
+		{Host: "mirror.test", Day: day, Dimension: "bot_category", Value: "AI Crawler", Requests: 30},
+	} {
+		if err := s.q.UpsertCloudflareDaily(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.q.SaveCredential(ctx, queries.SaveCredentialParams{
+		Kind: "cloudflare", Credential: []byte("sealed-secret"), KeyID: "key-1", Fingerprint: "3a7bd3e2360a",
+		Account: "zone-id", Target: "mirror.test", ActorSub: "sub-123", ActorName: "Joris Jonkers",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.q.InsertIntegrationEvent(ctx, queries.InsertIntegrationEventParams{
+		Kind: "cloudflare", Action: "sync", Ok: true, Detail: "imported 2 days", ActorSub: strp("sub-123"), ActorName: "Joris Jonkers",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	acct, err := s.q.UpsertAccount(ctx, queries.UpsertAccountParams{
+		Issuer: "https://auth.test", Sub: "sub-123", Name: "Joris Jonkers", Email: "joris@example.com", Roles: []string{"ROLE_ADMIN"}, Admin: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.q.CreateSession(ctx, queries.CreateSessionParams{
+		ID: "session-id", AccountID: acct.ID, RefreshToken: []byte("refresh-secret"), KeyID: "key-1", UserAgent: "Chrome", ExpiresAt: day.AddDate(1, 0, 0),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	db := exportedDB(t, s)
+	var cfRows, cfTotal int
+	var hasCredential bool
+	var target, events, roles string
+	err = db.QueryRow(`SELECT (SELECT count(*) FROM cloudflare_daily), (SELECT requests FROM cloudflare_daily WHERE dimension = 'total'),
+		(SELECT has_credential FROM integrations WHERE kind = 'cloudflare'), (SELECT target FROM integrations WHERE kind = 'cloudflare'),
+		(SELECT actor || ': ' || detail FROM integration_events), (SELECT roles FROM accounts)`).Scan(&cfRows, &cfTotal, &hasCredential, &target, &events, &roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfRows != 2 || cfTotal != 120 || !hasCredential || target != "mirror.test" || events != "Joris Jonkers: imported 2 days" || roles != "ROLE_ADMIN" {
+		t.Fatalf("cloudflare=%d total=%d credential=%v target=%q events=%q roles=%q", cfRows, cfTotal, hasCredential, target, events, roles)
+	}
+
+	// No table holds a secret or a personal identifier: not as a column, and not as a value.
+	rows, err := db.Query(`SELECT m.name, p.name FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type = 'table'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	columns := map[string][]string{}
+	for rows.Next() {
+		var table, column string
+		if err := rows.Scan(&table, &column); err != nil {
+			t.Fatal(err)
+		}
+		columns[table] = append(columns[table], column)
+		for _, banned := range []string{"credential", "key_id", "fingerprint", "refresh_token", "email", "sub", "issuer", "actor_sub", "created_by_sub", "updated_by_sub"} {
+			if column == banned {
+				t.Errorf("%s.%s is exported", table, column)
+			}
+		}
+	}
+	if _, ok := columns["sessions"]; ok {
+		t.Error("sessions are exported")
+	}
+	for table, cols := range columns {
+		for _, col := range cols {
+			var n int
+			q := fmt.Sprintf(`SELECT count(*) FROM %q WHERE CAST(%q AS TEXT) IN ('sealed-secret', 'refresh-secret', 'key-1', '3a7bd3e2360a', 'sub-123', 'joris@example.com', 'session-id')`, table, col)
+			if err := db.QueryRow(q).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			if n != 0 {
+				t.Errorf("%s.%s holds a secret", table, col)
+			}
+		}
 	}
 }
