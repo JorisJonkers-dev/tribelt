@@ -15,8 +15,10 @@ One Go binary serves everything:
   asynchronously to Postgres (a page never waits on the database). `/b` is the beacon, `/go` records
   an Outbound Click and redirects to tribelt.nl.
 - **`/stats`** for Stats Viewers (OIDC against auth-api): Overview, Pages (and page detail), Releases
-  (compare two Content Releases), AI & crawlers, Search, Integrations; CSV/SVG/PNG exports and an
-  anonymised SQLite download.
+  (compare two Content Releases), AI & crawlers, Search, Integrations; CSV/SVG/PNG exports and
+  a SQLite download of everything the mirror records except secrets (Hits and clicks
+  pseudonymised; Cloudflare's daily counts, the Integrations' state and log, and Accounts without
+  their auth-api subject or e-mail).
 - **Integrations** an admin connects in `/stats` (ADR-0005): a daily **Search Performance** import from
   Google Search Console and Bing Webmaster Tools, **IndexNow** submissions, and Cloudflare's edge
   request counts compared with Hits.
