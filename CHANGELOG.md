@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.11.0...v0.12.0) (2026-10-23)
+
+
+### Features
+
+* **stats:** export everything the mirror records, except secrets ([#39](https://github.com/JorisJonkers-dev/tribelt/issues/39)) ([20d18d6](https://github.com/JorisJonkers-dev/tribelt/commit/20d18d652dc672897423a3320bb057a77eb78903))
+
 ## [0.11.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.10.0...v0.11.0) (2026-10-21)
 
 
