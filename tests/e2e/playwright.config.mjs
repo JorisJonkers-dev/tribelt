@@ -5,7 +5,8 @@ export default defineConfig({
   testDir: ".",
   timeout: 30_000,
   retries: 0,
-  reporter: [["list"]],
+  // CI writes a blob report too, which the job turns into an HTML report.
+  reporter: process.env.CI ? [["blob"], ["list"]] : [["list"]],
   use: {
     ...devices["Desktop Chrome"],
     baseURL: process.env.E2E_BASE_URL || "http://localhost:18080",
