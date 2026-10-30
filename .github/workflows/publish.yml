@@ -23,7 +23,7 @@ permissions: {}
 jobs:
   # -- 1. Build and push the multi-arch container image ----------------------
   publish-image:
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@16d241e44f03c5cc4696d2d0de615717a61ef3c0 # v0.36.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@f3bb6cabaa6ee33694f8632ce273a4e703d60780 # v0.38.0
     with:
       image-name: tribelt
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -106,7 +106,7 @@ jobs:
       # The estate path's images lock share: the same digest, under the alias the project file names,
       # with the user the image runs as and the version it ships, read back from what was pushed.
       - name: lock-fragment-image
-        uses: JorisJonkers-dev/github-workflows/actions/resolve-image-lock@16d241e44f03c5cc4696d2d0de615717a61ef3c0 # v0.36.0
+        uses: JorisJonkers-dev/github-workflows/actions/resolve-image-lock@f3bb6cabaa6ee33694f8632ce273a4e703d60780 # v0.38.0
         with:
           name: tribelt
           images: |
@@ -117,7 +117,7 @@ jobs:
   # -- 3. Render and publish the deploy artifact ----------------------------
   publish-deploy-artifact:
     needs: [resolve-image-lock]
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/deploy-artifact.yml@16d241e44f03c5cc4696d2d0de615717a61ef3c0 # v0.36.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/deploy-artifact.yml@f3bb6cabaa6ee33694f8632ce273a4e703d60780 # v0.38.0
     with:
       ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
       artifact-name: tribelt
