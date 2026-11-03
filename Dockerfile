@@ -2,7 +2,7 @@
 # Cross-compiles on the build platform, so a multi-arch build needs no emulation for the Go stage.
 # content/ is embedded into the binary: one image is exactly one Content Release.
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 WORKDIR /src
 # Tailwind standalone CLI for the public stylesheet; keep the version in step with mise.toml.
 ARG BUILDARCH
