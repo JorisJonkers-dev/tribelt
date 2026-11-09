@@ -23,14 +23,17 @@ permissions: {}
 jobs:
   # -- 1. Build and push the multi-arch container image ----------------------
   publish-image:
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@ab93bf1c435304c5933ab33f9febe087ff8be214 # v0.43.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/container-publish.yml@f8f0a5ae583913de18143bbbbe0db9ecab970435 # v0.45.0
     with:
       image-name: tribelt
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
       platforms: linux/amd64,linux/arm64
+      require-package-proxy: true
     permissions:
       contents: read
       packages: write
+    secrets:
+      PACKAGES_PROXY_TOKEN: ${{ secrets.PACKAGES_PROXY_TOKEN }}
 
   # -- 2. Resolve the image lock (upload artifact, never path) --------------
   resolve-image-lock:
@@ -75,7 +78,7 @@ jobs:
       # The estate path's images lock share: this release's image, under the alias the project file names,
       # with the user the image runs as and the version it ships, read back from what was pushed.
       - name: lock-fragment-image
-        uses: JorisJonkers-dev/github-workflows/actions/resolve-image-lock@ab93bf1c435304c5933ab33f9febe087ff8be214 # v0.43.0
+        uses: JorisJonkers-dev/github-workflows/actions/resolve-image-lock@f8f0a5ae583913de18143bbbbe0db9ecab970435 # v0.45.0
         with:
           name: tribelt
           images: |
@@ -91,7 +94,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@ab93bf1c435304c5933ab33f9febe087ff8be214 # v0.43.0
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/publish-fragment.yml@f8f0a5ae583913de18143bbbbe0db9ecab970435 # v0.45.0
     with:
       project-file: deploy/tribelt.project.yml
       version: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -99,5 +102,7 @@ jobs:
       validate-with: deploy/env
       validate-with-fragments: auth
       images-lock-artifact: ${{ needs.resolve-image-lock.outputs.fragment-images-lock-artifact }}
+      require-package-proxy: true
     secrets:
       ESTATE_DISPATCH_APP_PRIVATE_KEY: ${{ secrets.ESTATE_DISPATCH_APP_PRIVATE_KEY }}
+      PACKAGES_PROXY_TOKEN: ${{ secrets.PACKAGES_PROXY_TOKEN }}
