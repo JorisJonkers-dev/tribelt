@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/JorisJonkers-dev/tribelt/compare/v0.12.0...v0.12.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **deps:** update minor and patch dependencies ([#43](https://github.com/JorisJonkers-dev/tribelt/issues/43)) ([a1997d8](https://github.com/JorisJonkers-dev/tribelt/commit/a1997d828caeaa86f099df5a8d36523d109f3891))
+
 ## [0.12.0](https://github.com/JorisJonkers-dev/tribelt/compare/v0.11.0...v0.12.0) (2026-10-23)
 
 
