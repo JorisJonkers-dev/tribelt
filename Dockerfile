@@ -7,13 +7,20 @@ WORKDIR /src
 # Tailwind standalone CLI for the public stylesheet; keep the version in step with mise.toml.
 ARG BUILDARCH
 ARG TAILWIND_VERSION=4.3.3
-RUN set -eu; \
+# apk installs through the package proxy when the build has its packages-netrc secret (CI); without it, from Alpine's own mirrors.
+RUN --mount=type=secret,id=packages-netrc,target=/root/.netrc,required=false \
+    set -eu; \
     case "${BUILDARCH}" in \
       amd64) arch=x64; sum=a04d34ceacc8f52cbe8920ad846cdeb61d3d0021dba32db0d1f77c9d9fad7a6c ;; \
       arm64) arch=arm64; sum=71ea4be79c9de9827545682df3e040053fb535d37c71ed2cfdedf9385a0868e0 ;; \
       *) echo "no Tailwind CLI for ${BUILDARCH}" >&2; exit 1 ;; \
     esac; \
-    apk add --no-cache libstdc++ libgcc; \
+    repos=""; \
+    if [ -s /root/.netrc ]; then \
+      v=$(cut -d. -f1,2 /etc/alpine-release); \
+      repos="--repositories-file /dev/null --repository https://packages.jorisjonkers.dev/apk/alpine/v$v/main --repository https://packages.jorisjonkers.dev/apk/alpine/v$v/community"; \
+    fi; \
+    apk add --no-cache $repos libstdc++ libgcc; \
     wget -qO /usr/local/bin/tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-${arch}-musl"; \
     echo "${sum}  /usr/local/bin/tailwindcss" | sha256sum -c -; \
     chmod +x /usr/local/bin/tailwindcss
