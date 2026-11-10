@@ -16,6 +16,7 @@ ALTER TABLE releases ADD COLUMN IF NOT EXISTS app_versions text [] NOT NULL DEFA
 ALTER TABLE releases ADD COLUMN IF NOT EXISTS tags text [] NOT NULL DEFAULT '{}';
 
 -- Images become Hits, served as format img.
+-- squawk-ignore ban-drop-constraint -- the replacement constraint is added by the next statement, and this migration is already applied
 ALTER TABLE hits DROP CONSTRAINT IF EXISTS hits_format_check;
 ALTER TABLE hits ADD CONSTRAINT hits_format_check
 CHECK (format IN ('html', 'md', 'txt', 'xml', 'img')) NOT VALID;
