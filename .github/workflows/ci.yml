@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0 # the Content Release gate diffs against the base branch and the latest tag
           fetch-tags: true
 
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           cache: true
 
@@ -139,7 +139,7 @@ jobs:
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "no @playwright/test version in tests/e2e/package-lock.json" >&2; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           cache: true
 
