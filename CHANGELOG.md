@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2](https://github.com/JorisJonkers-dev/tribelt/compare/v0.12.1...v0.12.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **hygiene:** never cancel a run of the required hygiene checks ([#69](https://github.com/JorisJonkers-dev/tribelt/issues/69)) ([741cdd7](https://github.com/JorisJonkers-dev/tribelt/commit/741cdd788bf6da283623565c067609bda774fc6c))
+
 ## [0.12.1](https://github.com/JorisJonkers-dev/tribelt/compare/v0.12.0...v0.12.1) (2026-11-10)
 
 
